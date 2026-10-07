@@ -153,7 +153,8 @@ For each game:
 8. **Before you bet:** line-up checks with a specific swap for each (for example "if X is out, swap leg 4 for …"), and a note that the app's total may differ because of correlation repricing.
 9. **Stake guidance:** a small fixed fraction of the balance (for example 10% on the 5x slip, 5% on the 20–25x slip, 2–3% on the 50–80x slip). Remind the user, once and briefly, that these are estimates and that every slip can lose.
 10. **Sources** list with links.
-11. **Phone notification:** after the report is delivered, call the `PushNotification` tool (load it with ToolSearch `select:PushNotification` if needed). Send one line under 200 characters with the game and the three slips' total odds and estimated chance of winning, for example `OLY-EFS slips ready: 5.0x (24%) · 22x (5%) · 64x (1.6%). Open Claude to see the picks.`. When Remote Control is connected, this reaches the user's phone.
+11. **Save the report** as Markdown to `reports/YYYY-MM-DD_HOME-AWAY.md` in the repo folder (for example `reports/2026-10-09_OLY-IST.md`), using the game date, and tell the user the path. Terminal windows on Windows often cut wide tables, so the file is the readable copy. Do not commit it.
+12. **Phone notification:** after the report is delivered, call the `PushNotification` tool (load it with ToolSearch `select:PushNotification` if needed). Send one line under 200 characters with the game and the three slips' total odds and estimated chance of winning, for example `OLY-EFS slips ready: 5.0x (24%) · 22x (5%) · 64x (1.6%). Open Claude to see the picks.`. When Remote Control is connected, this reaches the user's phone.
 
 ## Hard rules
 
