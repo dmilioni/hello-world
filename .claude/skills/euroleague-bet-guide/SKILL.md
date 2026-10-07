@@ -49,7 +49,17 @@ Search in English and Greek.
 - the per-round injury report (search "Injury report: Round N");
 - "Game Facts" and "Game Notes" previews for each game.
 
-Fetch the pages directly; if fetching is blocked, run WebSearch with `allowed_domains: ["euroleaguebasketball.net"]`, for example `Olympiacos Anadolu Efes game center 2026-27` or `injury report round 4`.
+**Get the official data with the helper script first.** It reads EuroLeague's own data service (`api-live.euroleague.net` and `live.euroleague.net`, the data behind the official site), which is the most reliable way in:
+
+```bash
+S=.claude/skills/euroleague-bet-guide/scripts/el_stats.py
+python3 -I $S schedule --teams OLY,PAN --from-round 4 --to-round 6   # dates (CET; Greek time = +1h), venues, game codes
+python3 -I $S team OLY                       # every played game: score, first scorer, first rebound, per-player min/pts/reb/ast/3pm/2pm/starter, averages
+python3 -I $S team IST --last 3              # opponent, last 3 games only
+python3 -I $S h2h OLY IST --season E2025     # last season's head-to-head with full player lines
+```
+
+Use it for the schedule, scores, box scores, season averages, starters, minutes load, and first scorer / first rebound history. The website itself (`euroleaguebasketball.net`) blocks automated browsers with a Vercel security check, so don't fetch it. For news that only the website has (the injury report, Game Facts), run WebSearch with `allowed_domains: ["euroleaguebasketball.net"]`, for example `injury report round 4`.
 
 How to apply it:
 - **If any other source disagrees with the official site, the official site wins.** Use its number and do not average or blend it with others.
