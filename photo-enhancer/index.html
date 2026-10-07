@@ -1,0 +1,1014 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+</head>
+<body>
+<!-- ARTIFACT-START -->
+<title>Snapshot Rescue</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: a light-table bench. Neutral grey viewing stage on the left, a lab-notes control column on the right. */
+:root {
+  --bg: #e8ebee;
+  --panel: #f7f8f9;
+  --ink: #1a1f24;
+  --muted: #5a646e;
+  --line: #cfd5db;
+  --accent: #9a5600;
+  --accent-ink: #ffffff;
+  --accent-soft: #f4e4cc;
+  --stage: #7d8084;
+  --stage-ink: #f2f3f4;
+  --ok: #2b7a4b;
+  --fix: #b3342a;
+  --font-display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --font-body: "IBM Plex Sans", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --radius: 6px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #15181b; --panel: #1d2125; --ink: #e7eaed; --muted: #9aa4ae; --line: #30363c;
+    --accent: #f0a63a; --accent-ink: #1a1206; --accent-soft: #3a2a12;
+    --stage: #3b3e41; --stage-ink: #e7eaed; --ok: #5cc48a; --fix: #f07a6e;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #15181b; --panel: #1d2125; --ink: #e7eaed; --muted: #9aa4ae; --line: #30363c;
+  --accent: #f0a63a; --accent-ink: #1a1206; --accent-soft: #3a2a12;
+  --stage: #3b3e41; --stage-ink: #e7eaed; --ok: #5cc48a; --fix: #f07a6e;
+  color-scheme: dark;
+}
+html, body { background: var(--bg); color: var(--ink); }
+body { font-family: var(--font-body); font-size: 14px; line-height: 1.5; }
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+button, input, select { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.top {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 24px;
+  max-width: 1600px; margin: 0 auto; padding-block: 18px 4px; padding-inline: max(16px, 2vw);
+}
+.brand { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.brand h1 { font-family: var(--font-display); font-weight: 700; font-size: 26px; line-height: 1.1; margin: 0; letter-spacing: -0.01em; text-wrap: balance; }
+.brand p { margin: 0; color: var(--muted); max-width: 62ch; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 8px 14px; border-radius: var(--radius); border: 1px solid var(--line);
+  background: var(--panel); cursor: pointer; font-weight: 500; white-space: nowrap;
+}
+.btn:hover { border-color: var(--muted); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.btn.primary:hover { filter: brightness(1.06); }
+.btn:disabled { opacity: .55; cursor: progress; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+.app {
+  display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 20px;
+  max-width: 1600px; margin: 0 auto; padding-block: 14px 28px; padding-inline: max(16px, 2vw);
+}
+@media (max-width: 900px) { .app { grid-template-columns: minmax(0, 1fr); } }
+
+.viewer { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.stage {
+  position: relative; display: flex; overflow: auto; border-radius: var(--radius);
+  background: var(--stage); height: clamp(300px, calc(100vh - 210px), 900px);
+}
+@media (max-width: 900px) { .stage { height: clamp(260px, 60vh, 620px); } }
+.stage.drag { outline: 3px dashed var(--accent); outline-offset: -8px; }
+.frame { position: relative; margin: auto; flex: none; box-shadow: 0 1px 12px rgba(0,0,0,.25); user-select: none; -webkit-user-select: none; }
+.frame canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.divider { position: absolute; top: 0; bottom: 0; width: 0; border-left: 2px solid #fff; box-shadow: 0 0 0 1px rgba(0,0,0,.35); cursor: ew-resize; }
+.knob {
+  position: absolute; top: 50%; left: -17px; width: 32px; height: 32px; margin-top: -16px; border-radius: 50%;
+  background: #fff; color: #1a1f24; display: grid; place-items: center; font: 600 13px/1 var(--font-mono);
+  box-shadow: 0 1px 6px rgba(0,0,0,.4); touch-action: none; cursor: ew-resize;
+}
+.tag {
+  position: absolute; top: 10px; padding: 2px 8px; border-radius: 4px; font: 500 11px/1.6 var(--font-mono);
+  letter-spacing: .08em; text-transform: uppercase; background: rgba(0,0,0,.55); color: #fff; pointer-events: none;
+}
+.tag.l { left: 10px; } .tag.r { right: 10px; }
+.drop-hint {
+  position: absolute; inset: 0; display: grid; place-items: center; color: var(--stage-ink);
+  font-family: var(--font-display); font-size: 20px; pointer-events: none;
+}
+
+.toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.status { margin-left: auto; color: var(--muted); font: 12px/1.4 var(--font-mono); font-variant-numeric: tabular-nums; min-width: 0; }
+.status.busy::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); margin-right: 6px; animation: pulse 1s infinite ease-in-out; }
+@keyframes pulse { 50% { opacity: .25; } }
+@media (prefers-reduced-motion: reduce) { .status.busy::before { animation: none; } }
+
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; background: var(--panel); }
+.seg button { border: 0; background: transparent; padding: 6px 12px; cursor: pointer; white-space: nowrap; }
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
+.seg button:disabled { opacity: .4; cursor: not-allowed; }
+.seg.full { display: flex; } .seg.full button { flex: 1; padding-inline: 6px; }
+
+.panel { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px; display: flex; flex-direction: column; gap: 12px; }
+.card h2 {
+  margin: 0; font: 600 11px/1.3 var(--font-body); text-transform: uppercase; letter-spacing: .1em; color: var(--muted);
+  display: flex; justify-content: space-between; gap: 8px;
+}
+.file { font: 12px/1.4 var(--font-mono); color: var(--muted); overflow-wrap: anywhere; }
+
+.diag { display: grid; grid-template-columns: auto 1fr auto; gap: 6px 10px; align-items: center; margin: 0; }
+.diag dt { color: var(--muted); }
+.diag dd { margin: 0; display: contents; }
+.chip { justify-self: start; display: inline-flex; align-items: center; gap: 6px; font-weight: 500; }
+.chip::before { content: ""; width: 8px; height: 8px; border-radius: 2px; background: var(--ok); }
+.chip.fix::before { background: var(--fix); border-radius: 50%; }
+.diag .num { font: 12px var(--font-mono); color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; }
+
+.ctl { display: flex; flex-direction: column; gap: 2px; }
+.ctl label { display: flex; justify-content: space-between; gap: 8px; }
+.ctl output { font: 12px/1.6 var(--font-mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+.ctl input[type=range] { width: 100%; margin: 0; accent-color: var(--accent); height: 22px; }
+.group { display: flex; flex-direction: column; gap: 10px; }
+.group + .group { border-top: 1px solid var(--line); padding-top: 12px; }
+.group h3 { margin: 0; font: 600 13px/1.3 var(--font-display); letter-spacing: .01em; }
+.note { margin: 0; font-size: 12px; color: var(--muted); }
+.mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+.hist { width: 100%; height: 76px; display: block; }
+.legend { display: flex; gap: 14px; font-size: 12px; color: var(--muted); }
+.legend span::before { content: ""; display: inline-block; width: 14px; height: 0; vertical-align: middle; margin-right: 6px; }
+.legend .b::before { border-top: 2px dashed var(--muted); }
+.legend .a::before { border-top: 6px solid var(--accent); opacity: .7; }
+
+.sheet { position: fixed; inset: 0; background: rgba(0,0,0,.7); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 16px; z-index: 10; }
+.sheet img { max-height: 75vh; max-width: 100%; box-shadow: 0 2px 20px rgba(0,0,0,.5); }
+.sheet p { color: #fff; margin: 0; text-align: center; }
+</style>
+
+<header class="top">
+  <div class="brand">
+    <h1>Snapshot Rescue</h1>
+    <p>Cleans up grainy, dull, small photos. Everything runs in your browser, so your photo never leaves this device.</p>
+  </div>
+  <div class="actions">
+    <label class="btn primary" for="file">Open photo</label>
+    <input id="file" class="sr" type="file" accept="image/*">
+    <button class="btn" id="sampleBtn" type="button">Load sample</button>
+  </div>
+</header>
+
+<main class="app">
+  <section class="viewer" aria-label="Before and after preview">
+    <div class="stage" id="stage">
+      <div class="frame" id="frame" hidden>
+        <canvas id="cvBefore"></canvas>
+        <canvas id="cvAfter"></canvas>
+        <div class="divider" id="divider"><span class="knob" id="knob" role="slider" tabindex="0" aria-label="Before and after split" aria-valuemin="0" aria-valuemax="100" aria-valuenow="50">⇔</span></div>
+        <span class="tag l" id="tagL">Before</span>
+        <span class="tag r" id="tagR">After</span>
+      </div>
+      <div class="drop-hint" id="dropHint">Drop a photo here</div>
+    </div>
+    <div class="toolbar">
+      <div class="seg" role="group" aria-label="View">
+        <button type="button" data-view="split" aria-pressed="true">Split</button>
+        <button type="button" data-view="before" aria-pressed="false">Before</button>
+        <button type="button" data-view="after" aria-pressed="false">After</button>
+      </div>
+      <div class="seg" role="group" aria-label="Zoom">
+        <button type="button" data-zoom="fit" aria-pressed="true">Fit</button>
+        <button type="button" data-zoom="1" aria-pressed="false">100%</button>
+      </div>
+      <span class="status" id="status" aria-live="polite"></span>
+    </div>
+    <p class="note">Drag the divider to compare. You can also drop or paste a photo anywhere on the page.</p>
+  </section>
+
+  <aside class="panel">
+    <div class="card">
+      <h2><span>Diagnosis</span><span class="file" id="fileInfo"></span></h2>
+      <dl class="diag" id="diag"></dl>
+    </div>
+
+    <div class="card">
+      <h2>Fix</h2>
+      <div class="seg full" role="group" aria-label="Preset" id="presets">
+        <button type="button" data-preset="auto" aria-pressed="true">Auto</button>
+        <button type="button" data-preset="scan">Old print</button>
+        <button type="button" data-preset="night">Low light</button>
+        <button type="button" data-preset="soft">Blurry</button>
+        <button type="button" data-preset="off">None</button>
+      </div>
+      <p class="note" id="presetNote">Auto settings come from the diagnosis above.</p>
+      <div id="controls"></div>
+      <div class="group">
+        <h3>Size</h3>
+        <div class="seg full" role="group" aria-label="Upscale" id="upscale">
+          <button type="button" data-up="1">1×</button>
+          <button type="button" data-up="2">2×</button>
+          <button type="button" data-up="4">4×</button>
+        </div>
+        <p class="note mono" id="outInfo"></p>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Brightness histogram</h2>
+      <canvas class="hist" id="hist" aria-label="Brightness histogram before and after"></canvas>
+      <div class="legend"><span class="b">Before</span><span class="a">After</span></div>
+    </div>
+
+    <div class="card">
+      <h2>Save</h2>
+      <div class="seg full" role="group" aria-label="File format" id="format">
+        <button type="button" data-fmt="jpg" aria-pressed="true">JPEG</button>
+        <button type="button" data-fmt="png" aria-pressed="false">PNG</button>
+      </div>
+      <button class="btn primary" id="saveBtn" type="button">Save enhanced photo</button>
+      <p class="note" id="saveStatus">Saves at full output size.</p>
+    </div>
+  </aside>
+</main>
+
+<div class="sheet" id="sheet" hidden>
+  <img id="sheetImg" alt="Enhanced photo at full size">
+  <p>Right-click or long-press the photo and choose Save Image.</p>
+  <button class="btn" id="sheetClose" type="button">Close</button>
+</div>
+
+<script type="text/plain" id="engine">
+// Image engine: pure functions over Float32 planes. Runs inside a Web Worker.
+function clamp01(v) { return v < 0 ? 0 : v > 1 ? 1 : v; }
+
+// Box blur, edge-clamped, separable running sums.
+function boxH(src, dst, w, h, r) {
+  const norm = 1 / (2 * r + 1);
+  for (let y = 0; y < h; y++) {
+    const o = y * w;
+    let s = src[o] * (r + 1);
+    for (let i = 1; i <= r; i++) s += src[o + Math.min(i, w - 1)];
+    for (let x = 0; x < w; x++) {
+      dst[o + x] = s * norm;
+      s += src[o + Math.min(x + r + 1, w - 1)] - src[o + Math.max(x - r, 0)];
+    }
+  }
+}
+function boxV(src, dst, w, h, r) {
+  const norm = 1 / (2 * r + 1);
+  const acc = new Float64Array(w);
+  for (let x = 0; x < w; x++) acc[x] = src[x] * (r + 1);
+  for (let i = 1; i <= r; i++) { const o = Math.min(i, h - 1) * w; for (let x = 0; x < w; x++) acc[x] += src[o + x]; }
+  for (let y = 0; y < h; y++) {
+    const o = y * w, oa = Math.min(y + r + 1, h - 1) * w, os = Math.max(y - r, 0) * w;
+    for (let x = 0; x < w; x++) { dst[o + x] = acc[x] * norm; acc[x] += src[oa + x] - src[os + x]; }
+  }
+}
+function box(src, dst, w, h, r, tmp) { boxH(src, tmp, w, h, r); boxV(tmp, dst, w, h, r); }
+function gauss(src, dst, w, h, r, passes, tmp) {
+  box(src, dst, w, h, r, tmp);
+  for (let p = 1; p < passes; p++) box(dst, dst, w, h, r, tmp);
+}
+
+// Guided filter (He et al.): edge-preserving smoothing of p, steered by guide I.
+function guided(I, p, w, h, r, eps, out) {
+  const N = w * h, same = I === p;
+  const tmp = new Float32Array(N), mI = new Float32Array(N), cII = new Float32Array(N), prod = new Float32Array(N);
+  const mP = same ? mI : new Float32Array(N), cIP = same ? cII : new Float32Array(N);
+  box(I, mI, w, h, r, tmp);
+  if (!same) box(p, mP, w, h, r, tmp);
+  for (let i = 0; i < N; i++) prod[i] = I[i] * I[i];
+  box(prod, cII, w, h, r, tmp);
+  if (!same) { for (let i = 0; i < N; i++) prod[i] = I[i] * p[i]; box(prod, cIP, w, h, r, tmp); }
+  const a = prod, b = new Float32Array(N);
+  for (let i = 0; i < N; i++) {
+    const varI = cII[i] - mI[i] * mI[i], cov = cIP[i] - mI[i] * mP[i];
+    const ai = cov / (varI + eps);
+    a[i] = ai; b[i] = mP[i] - ai * mI[i];
+  }
+  box(a, cII, w, h, r, tmp);
+  box(b, mI, w, h, r, tmp);
+  for (let i = 0; i < N; i++) out[i] = cII[i] * I[i] + mI[i];
+}
+
+// Separable Catmull-Rom resampling.
+function taps(n, m) {
+  const idx = new Int32Array(m * 4), wt = new Float32Array(m * 4), sc = n / m;
+  for (let o = 0; o < m; o++) {
+    const s = (o + 0.5) * sc - 0.5, i0 = Math.floor(s), t = s - i0, t2 = t * t, t3 = t2 * t, k = o * 4;
+    wt[k] = -0.5 * t3 + t2 - 0.5 * t;
+    wt[k + 1] = 1.5 * t3 - 2.5 * t2 + 1;
+    wt[k + 2] = -1.5 * t3 + 2 * t2 + 0.5 * t;
+    wt[k + 3] = 0.5 * t3 - 0.5 * t2;
+    for (let j = 0; j < 4; j++) idx[k + j] = Math.min(n - 1, Math.max(0, i0 - 1 + j));
+  }
+  return [idx, wt];
+}
+function resize(src, w, h, W, H) {
+  const [xi, xw] = taps(w, W), [yi, yw] = taps(h, H);
+  const tmp = new Float32Array(W * h);
+  for (let y = 0; y < h; y++) {
+    const row = y * w, o = y * W;
+    for (let x = 0; x < W; x++) {
+      const k = x * 4;
+      tmp[o + x] = src[row + xi[k]] * xw[k] + src[row + xi[k + 1]] * xw[k + 1] + src[row + xi[k + 2]] * xw[k + 2] + src[row + xi[k + 3]] * xw[k + 3];
+    }
+  }
+  const out = new Float32Array(W * H);
+  for (let y = 0; y < H; y++) {
+    const k = y * 4, r0 = yi[k] * W, r1 = yi[k + 1] * W, r2 = yi[k + 2] * W, r3 = yi[k + 3] * W;
+    const w0 = yw[k], w1 = yw[k + 1], w2 = yw[k + 2], w3 = yw[k + 3], o = y * W;
+    for (let x = 0; x < W; x++) out[o + x] = tmp[r0 + x] * w0 + tmp[r1 + x] * w1 + tmp[r2 + x] * w2 + tmp[r3 + x] * w3;
+  }
+  return out;
+}
+
+function pct(hist, total, q) {
+  const target = total * q; let acc = 0;
+  for (let i = 0; i < hist.length; i++) { acc += hist[i]; if (acc >= target) return i / (hist.length - 1); }
+  return 1;
+}
+
+// Immerkær's Laplacian noise estimator (σ in 0–255 units), skipping the strongest 20% of edges so texture is not counted as noise.
+function noiseSigma(Y, w, h) {
+  const gh = new Uint32Array(512), inner = Math.max(1, (w - 2) * (h - 2));
+  for (let y = 1; y < h - 1; y++) for (let x = 1; x < w - 1; x++) {
+    const i = y * w + x;
+    gh[Math.min(511, ((Math.abs(Y[i + 1] - Y[i - 1]) + Math.abs(Y[i + w] - Y[i - w])) * 255) | 0)]++;
+  }
+  const gFlat = pct(gh, inner, 0.8) * 511 / 255 + 1 / 255;
+  let sum = 0, n = 0;
+  for (let y = 1; y < h - 1; y++) for (let x = 1; x < w - 1; x++) {
+    const i = y * w + x;
+    if (Math.abs(Y[i + 1] - Y[i - 1]) + Math.abs(Y[i + w] - Y[i - w]) > gFlat) continue;
+    sum += Math.abs(Y[i - w - 1] - 2 * Y[i - w] + Y[i - w + 1] - 2 * Y[i - 1] + 4 * Y[i] - 2 * Y[i + 1] + Y[i + w - 1] - 2 * Y[i + w] + Y[i + w + 1]);
+    n++;
+  }
+  return n ? sum * 255 * Math.sqrt(Math.PI / 2) / (6 * n) : 0;
+}
+
+// Measure what is wrong with a photo: noise, softness, color cast, exposure, contrast.
+function analyze(d, w, h) {
+  const N = w * h, Y = new Float32Array(N), hist = new Uint32Array(256);
+  let sCb = 0, sCr = 0, nMid = 0, sSat = 0;
+  for (let i = 0; i < N; i++) {
+    const r = d[i * 4] / 255, g = d[i * 4 + 1] / 255, b = d[i * 4 + 2] / 255;
+    const y = 0.299 * r + 0.587 * g + 0.114 * b;
+    Y[i] = y; hist[Math.min(255, (y * 255) | 0)]++;
+    const cb = (b - y) * 0.564, cr = (r - y) * 0.713;
+    sSat += Math.hypot(cb, cr);
+    if (y > 0.12 && y < 0.92) { sCb += cb; sCr += cr; nMid++; }
+  }
+  // Noise is measured at full and half resolution: JPEG turns grain into blotches the full-res estimate misses.
+  const hw = w >> 1, hh = h >> 1, Yh = new Float32Array(hw * hh);
+  for (let y = 0; y < hh; y++) for (let x = 0; x < hw; x++) {
+    const i = 2 * y * w + 2 * x;
+    Yh[y * hw + x] = (Y[i] + Y[i + 1] + Y[i + w] + Y[i + w + 1]) / 4;
+  }
+  const sigma = Math.max(noiseSigma(Y, w, h), hw > 8 && hh > 8 ? 1.6 * noiseSigma(Yh, hw, hh) : 0);
+  // Detail: high- vs mid-frequency energy along the strongest edges.
+  const gh = new Uint32Array(512), grad = new Float32Array(N);
+  for (let y = 1; y < h - 1; y++) for (let x = 1; x < w - 1; x++) {
+    const i = y * w + x, g = Math.abs(Y[i + 1] - Y[i - 1]) + Math.abs(Y[i + w] - Y[i - w]);
+    grad[i] = g; gh[Math.min(511, (g * 255) | 0)]++;
+  }
+  const gEdge = pct(gh, Math.max(1, (w - 2) * (h - 2)), 0.92) * 511 / 255;
+  let hf = 0, mf = 0;
+  const tmp = new Float32Array(N), b1 = new Float32Array(N), b4 = new Float32Array(N);
+  box(Y, b1, w, h, 1, tmp); box(Y, b4, w, h, 3, tmp); box(b4, b4, w, h, 3, tmp);
+  for (let y = 1; y < h - 1; y++) for (let x = 1; x < w - 1; x++) {
+    const i = y * w + x;
+    if (grad[i] >= gEdge) { hf += Math.abs(Y[i] - b1[i]); mf += Math.abs(b1[i] - b4[i]); }
+  }
+  const sharpRatio = mf > 0 ? hf / mf : 0;
+  return {
+    sigma, sharpRatio,
+    cb: nMid ? sCb / nMid : 0, cr: nMid ? sCr / nMid : 0, chroma: sSat / N,
+    median: pct(hist, N, 0.5), p1: pct(hist, N, 0.01), p99: pct(hist, N, 0.99)
+  };
+}
+
+function processImage(m) {
+  const { w, h, data, P, up, rs } = m, N = w * h;
+  let Y = new Float32Array(N), U = new Float32Array(N), V = new Float32Array(N);
+  const histBefore = new Uint32Array(256);
+  for (let i = 0; i < N; i++) {
+    const r = data[i * 4] / 255, g = data[i * 4 + 1] / 255, b = data[i * 4 + 2] / 255;
+    const y = 0.299 * r + 0.587 * g + 0.114 * b;
+    Y[i] = y; U[i] = (b - y) * 0.564; V[i] = (r - y) * 0.713;
+    histBefore[Math.min(255, (y * 255) | 0)]++;
+  }
+
+  // 1. Denoise: guided filter on brightness, then chroma smoothed along brightness edges.
+  const d = P.denoise / 100;
+  if (d > 0.001) {
+    const q = new Float32Array(N);
+    const ry = Math.max(1, Math.round((1 + 3 * d) * rs));
+    guided(Y, Y, w, h, ry, Math.pow(0.01 + 0.05 * d, 2), q);
+    const k = Math.min(1, 0.35 + 0.75 * d);
+    for (let i = 0; i < N; i++) Y[i] += (q[i] - Y[i]) * k;
+    const rc = Math.max(1, Math.round((2 + 6 * d) * rs)), ec = Math.pow(0.01 + 0.05 * d, 2), kc = Math.min(1, 0.5 + d);
+    guided(Y, U, w, h, rc, ec, q); for (let i = 0; i < N; i++) U[i] += (q[i] - U[i]) * kc;
+    guided(Y, V, w, h, rc, ec, q); for (let i = 0; i < N; i++) V[i] += (q[i] - V[i]) * kc;
+  }
+
+  // 2. Levels, white balance, auto gamma, warmth and exposure, folded into one lookup table per channel.
+  const R = new Float32Array(N), G = new Float32Array(N), B = new Float32Array(N);
+  const BINS = 1024, hR = new Uint32Array(BINS), hG = new Uint32Array(BINS), hB = new Uint32Array(BINS);
+  for (let i = 0; i < N; i++) {
+    const y = Y[i], u = U[i], v = V[i];
+    const r = clamp01(y + 1.403 * v), g = clamp01(y - 0.344 * u - 0.714 * v), b = clamp01(y + 1.773 * u);
+    R[i] = r; G[i] = g; B[i] = b;
+    hR[(r * (BINS - 1)) | 0]++; hG[(g * (BINS - 1)) | 0]++; hB[(b * (BINS - 1)) | 0]++;
+  }
+  const t = P.tone / 100, wb = P.wb / 100, hs = [hR, hG, hB];
+  const lo = hs.map(x => pct(x, N, 0.005)), hi = hs.map(x => pct(x, N, 0.995)), med = hs.map(x => pct(x, N, 0.5));
+  const cLo = Math.min(...lo), cHi = Math.max(...hi);
+  const L = [0, 0, 0], H = [1, 1, 1], mapped = [0, 0, 0];
+  for (let c = 0; c < 3; c++) {
+    L[c] = t * cLo + wb * (lo[c] - cLo);
+    H[c] = 1 + t * (cHi - 1) + wb * (hi[c] - cHi);
+    if (H[c] - L[c] < 0.1) H[c] = L[c] + 0.1;
+    mapped[c] = Math.min(0.98, Math.max(0.02, (med[c] - L[c]) / (H[c] - L[c])));
+  }
+  // Midtone white balance: per-channel gamma that pulls the channel medians together.
+  const avgMed = (mapped[0] + mapped[1] + mapped[2]) / 3, gc = [1, 1, 1];
+  for (let c = 0; c < 3; c++) {
+    const g = Math.min(1.33, Math.max(0.75, Math.log(avgMed) / Math.log(mapped[c])));
+    gc[c] = 1 + (g - 1) * wb * 0.7;
+  }
+  const medL = Math.min(0.95, Math.max(0.03, Math.pow(avgMed, 1)));
+  const gAuto = Math.min(1.5, Math.max(0.6, Math.log(0.46) / Math.log(medL)));
+  const gT = 1 + (gAuto - 1) * t * 0.75;
+  const warm = P.warmth / 100, gain = [1 + 0.12 * warm, 1 + 0.02 * warm, 1 - 0.12 * warm];
+  const e = Math.pow(2, P.exposure), LUTN = 4096, luts = [];
+  for (let c = 0; c < 3; c++) {
+    const lut = new Float32Array(LUTN);
+    for (let k = 0; k < LUTN; k++) {
+      let x = clamp01((k / (LUTN - 1) - L[c]) / (H[c] - L[c]));
+      x = Math.pow(Math.pow(x, gc[c]), gT) * gain[c];
+      const lin = Math.pow(x, 2.2), lin2 = lin * e / (1 + (e - 1) * lin);
+      lut[k] = Math.pow(Math.max(0, lin2), 1 / 2.2);
+    }
+    luts.push(lut);
+  }
+  const [lR, lG, lB] = luts;
+  for (let i = 0; i < N; i++) {
+    const r = lR[(R[i] * (LUTN - 1) + 0.5) | 0], g = lG[(G[i] * (LUTN - 1) + 0.5) | 0], b = lB[(B[i] * (LUTN - 1) + 0.5) | 0];
+    const y = 0.299 * r + 0.587 * g + 0.114 * b;
+    Y[i] = y; U[i] = (b - y) * 0.564; V[i] = (r - y) * 0.713;
+  }
+
+  // 3. Shadow lift and clarity (local contrast), both driven by a wide blur of brightness.
+  const s = P.shadows / 100, cl = P.clarity / 100;
+  if (s > 0 || cl > 0) {
+    const rL = Math.max(2, Math.round(Math.min(w, h) * 0.015));
+    const bl = new Float32Array(N), tmp = new Float32Array(N);
+    gauss(Y, bl, w, h, rL, 3, tmp);
+    for (let i = 0; i < N; i++) {
+      let y = Y[i]; const by = bl[i];
+      if (s > 0) {
+        const mk = Math.max(0, 1 - by * 1.9), y0 = y;
+        y = y + s * mk * mk * (Math.sqrt(Math.max(y, 0)) - y) * 1.4;
+        const ratio = Math.sqrt(Math.min(2, (y + 0.02) / (y0 + 0.02)));
+        U[i] *= ratio; V[i] *= ratio;
+      }
+      if (cl > 0) y += cl * 1.1 * (y - by) * (0.35 + 2.6 * Math.max(0, y * (1 - y)));
+      Y[i] = y;
+    }
+  }
+
+  // 4. Vibrance: boost muted colors more than already-saturated ones.
+  const vib = P.color / 100;
+  if (vib !== 0) {
+    for (let i = 0; i < N; i++) {
+      const sat = Math.hypot(U[i], V[i]);
+      const f = vib > 0 ? 1 + vib * Math.max(0.15, 1 - sat * 3.5) : 1 + vib;
+      U[i] *= f; V[i] *= f;
+    }
+  }
+
+  // 5. Upscale.
+  let W = w, Ht = h;
+  if (up > 1) {
+    W = Math.round(w * up); Ht = Math.round(h * up);
+    Y = resize(Y, w, h, W, Ht); U = resize(U, w, h, W, Ht); V = resize(V, w, h, W, Ht);
+  }
+  const N2 = W * Ht;
+
+  // 6. Sharpen: unsharp mask on brightness with a soft noise threshold.
+  const a = P.sharpen / 100;
+  if (a > 0) {
+    const bl = new Float32Array(N2), tmp = new Float32Array(N2);
+    const r = Math.max(1, Math.round((up >= 4 ? 2 : 1) * rs));
+    gauss(Y, bl, W, Ht, r, up >= 2 ? 3 : 2, tmp);
+    const amt = a * 2.4, thr = 0.006;
+    for (let i = 0; i < N2; i++) {
+      let dd = Y[i] - bl[i]; const ad = Math.abs(dd);
+      dd = ad < thr ? 0 : (dd > 0 ? ad - thr : thr - ad);
+      Y[i] += amt * Math.max(-0.2, Math.min(0.2, dd));
+    }
+  }
+
+  const out = new Uint8ClampedArray(N2 * 4), histAfter = new Uint32Array(256);
+  for (let i = 0; i < N2; i++) {
+    const y = Y[i], u = U[i], v = V[i], o = i * 4;
+    out[o] = (y + 1.403 * v) * 255 + 0.5;
+    out[o + 1] = (y - 0.344 * u - 0.714 * v) * 255 + 0.5;
+    out[o + 2] = (y + 1.773 * u) * 255 + 0.5;
+    out[o + 3] = 255;
+    histAfter[Math.min(255, Math.max(0, (y * 255) | 0))]++;
+  }
+  return { W, H: Ht, out, histBefore, histAfter };
+}
+</script>
+
+<script>
+(() => {
+  const $ = s => document.querySelector(s);
+  const EXPORT_MAX = 12e6, PREVIEW_MAX = 4e6, SOURCE_MAX_SIDE = 4096;
+
+  const CONTROLS = [
+    { group: "Clean up", items: [
+      { id: "denoise", label: "Denoise", min: 0, max: 100, step: 1 },
+      { id: "sharpen", label: "Sharpen", min: 0, max: 100, step: 1 } ] },
+    { group: "Light", items: [
+      { id: "tone", label: "Auto levels", min: 0, max: 100, step: 1, fmt: v => v + "%" },
+      { id: "exposure", label: "Exposure", min: -2, max: 2, step: 0.1, fmt: v => (v > 0 ? "+" : v < 0 ? "−" : "±") + Math.abs(v).toFixed(1) + " EV" },
+      { id: "shadows", label: "Shadows", min: 0, max: 100, step: 1 },
+      { id: "clarity", label: "Clarity", min: 0, max: 100, step: 1 } ] },
+    { group: "Color", items: [
+      { id: "wb", label: "Remove color cast", min: 0, max: 100, step: 1, fmt: v => v + "%" },
+      { id: "warmth", label: "Warmth", min: -100, max: 100, step: 1, fmt: v => (v > 0 ? "+" : v < 0 ? "−" : "±") + Math.abs(v * 20) + " K" },
+      { id: "color", label: "Vibrance", min: -100, max: 100, step: 1, fmt: v => (v > 0 ? "+" : v < 0 ? "−" : "") + Math.abs(v) } ] }
+  ];
+  const NEUTRAL = { denoise: 0, sharpen: 0, tone: 0, exposure: 0, shadows: 0, clarity: 0, wb: 0, warmth: 0, color: 0 };
+  const PRESETS = {
+    scan:  { denoise: 45, sharpen: 40, tone: 100, exposure: 0, shadows: 15, clarity: 30, wb: 90, warmth: 0, color: 25 },
+    night: { denoise: 75, sharpen: 30, tone: 100, exposure: 0.5, shadows: 55, clarity: 15, wb: 55, warmth: 0, color: 10 },
+    soft:  { denoise: 15, sharpen: 85, tone: 60, exposure: 0, shadows: 10, clarity: 40, wb: 40, warmth: 0, color: 10 },
+    off: NEUTRAL
+  };
+  const PRESET_NOTES = {
+    auto: "Auto settings come from the diagnosis above.",
+    scan: "For faded or yellowed prints and scans.",
+    night: "For dark, grainy indoor or night shots.",
+    soft: "For out-of-focus or heavily compressed images.",
+    off: "No changes, apart from any upscaling.",
+    custom: "Custom settings."
+  };
+
+  const state = {
+    src: null, srcCanvas: null, srcData: null, analysis: null, auto: null,
+    params: { ...NEUTRAL }, preset: "auto", up: 2, view: "split", split: 0.5, zoom: "fit",
+    fmt: "jpg", hist: null, previewScale: 1
+  };
+
+  // ---------- Engine (worker, with in-page fallback) ----------
+  const engineSrc = $("#engine").textContent;
+  let worker = null, engine = null, seq = 0;
+  const pending = new Map();
+  try {
+    const url = URL.createObjectURL(new Blob([engineSrc + `
+      self.onmessage = e => {
+        const m = e.data;
+        try {
+          if (m.type === "analyze") postMessage({ id: m.id, result: analyze(m.data, m.w, m.h) });
+          else { const r = processImage(m); postMessage({ id: m.id, result: r }, [r.out.buffer]); }
+        } catch (err) { postMessage({ id: m.id, error: String(err && err.message || err) }); }
+      };`], { type: "text/javascript" }));
+    worker = new Worker(url);
+    worker.onmessage = e => {
+      const p = pending.get(e.data.id); if (!p) return;
+      pending.delete(e.data.id);
+      e.data.error ? p.reject(new Error(e.data.error)) : p.resolve(e.data.result);
+    };
+    worker.onerror = e => { e.preventDefault(); fallbackAll(); };
+  } catch (err) { worker = null; }
+  function getEngine() {
+    if (!engine) engine = new Function(engineSrc + "\nreturn { analyze, processImage };")();
+    return engine;
+  }
+  function fallbackAll() {
+    worker = null;
+    for (const [id, p] of pending) { pending.delete(id); runLocal(p.msg).then(p.resolve, p.reject); }
+  }
+  function runLocal(msg) {
+    return new Promise((res, rej) => setTimeout(() => {
+      try {
+        const E = getEngine();
+        res(msg.type === "analyze" ? E.analyze(msg.data, msg.w, msg.h) : E.processImage(msg));
+      } catch (err) { rej(err); }
+    }, 16));
+  }
+  function call(msg) {
+    if (!worker) return runLocal(msg);
+    const id = ++seq; msg.id = id;
+    return new Promise((resolve, reject) => {
+      pending.set(id, { resolve, reject, msg });
+      worker.postMessage(msg, [msg.data.buffer]);
+    });
+  }
+
+  const downloadsReady = (window.claude && typeof window.claude.use === "function")
+    ? Promise.resolve(window.claude.use("downloads")).catch(() => null) : Promise.resolve(null);
+
+  // ---------- UI construction ----------
+  const controlsEl = $("#controls");
+  for (const g of CONTROLS) {
+    const grp = document.createElement("div"); grp.className = "group";
+    grp.innerHTML = `<h3>${g.group}</h3>`;
+    for (const c of g.items) {
+      const wrap = document.createElement("div"); wrap.className = "ctl";
+      wrap.innerHTML = `<label for="ctl-${c.id}"><span>${c.label}</span><output id="out-${c.id}" for="ctl-${c.id}"></output></label>
+        <input type="range" id="ctl-${c.id}" min="${c.min}" max="${c.max}" step="${c.step}">`;
+      grp.appendChild(wrap);
+      wrap.querySelector("input").addEventListener("input", e => {
+        state.params[c.id] = parseFloat(e.target.value);
+        showValue(c);
+        setPreset("custom", false);
+        requestRender();
+      });
+    }
+    controlsEl.appendChild(grp);
+  }
+  const ALL = CONTROLS.flatMap(g => g.items);
+  function showValue(c) {
+    const v = state.params[c.id];
+    $("#out-" + c.id).textContent = c.fmt ? c.fmt(v) : String(v);
+  }
+  function syncControls() {
+    for (const c of ALL) { $("#ctl-" + c.id).value = state.params[c.id]; showValue(c); }
+  }
+  function setPressed(container, attr, value) {
+    container.querySelectorAll(`[data-${attr}]`).forEach(b => b.setAttribute("aria-pressed", String(b.dataset[attr] === String(value))));
+  }
+  function setPreset(name, apply = true) {
+    state.preset = name;
+    setPressed($("#presets"), "preset", name);
+    $("#presetNote").textContent = PRESET_NOTES[name];
+    if (!apply) return;
+    state.params = { ...(name === "auto" ? (state.auto || NEUTRAL) : PRESETS[name]) };
+    syncControls();
+    requestRender(0);
+  }
+  $("#presets").addEventListener("click", e => {
+    const b = e.target.closest("[data-preset]"); if (b) setPreset(b.dataset.preset);
+  });
+  $("#upscale").addEventListener("click", e => {
+    const b = e.target.closest("[data-up]"); if (!b || b.disabled) return;
+    state.up = +b.dataset.up; updateUpscale(); requestRender(0);
+  });
+  $("#format").addEventListener("click", e => {
+    const b = e.target.closest("[data-fmt]"); if (!b) return;
+    state.fmt = b.dataset.fmt; setPressed($("#format"), "fmt", state.fmt);
+  });
+  document.querySelector('[aria-label="View"]').addEventListener("click", e => {
+    const b = e.target.closest("[data-view]"); if (!b) return;
+    state.view = b.dataset.view; setPressed(b.parentElement, "view", state.view); applySplit();
+  });
+  document.querySelector('[aria-label="Zoom"]').addEventListener("click", e => {
+    const b = e.target.closest("[data-zoom]"); if (!b) return;
+    state.zoom = b.dataset.zoom; setPressed(b.parentElement, "zoom", state.zoom); layoutFrame();
+  });
+
+  function updateUpscale() {
+    const s = state.src;
+    $("#upscale").querySelectorAll("[data-up]").forEach(b => {
+      const u = +b.dataset.up;
+      b.disabled = !!s && s.w * s.h * u * u > EXPORT_MAX;
+      b.title = b.disabled ? "Output would exceed 12 megapixels" : "";
+    });
+    if (s && s.w * s.h * state.up * state.up > EXPORT_MAX) state.up = s.w * s.h * 4 <= EXPORT_MAX ? 2 : 1;
+    setPressed($("#upscale"), "up", state.up);
+    if (s) {
+      const W = Math.round(s.w * state.up), H = Math.round(s.h * state.up);
+      $("#outInfo").textContent = `${s.w} × ${s.h} → ${W} × ${H} px · ${(W * H / 1e6).toFixed(1)} MP`;
+    }
+  }
+
+  // ---------- Status ----------
+  function setStatus(text, busy = false) {
+    const el = $("#status"); el.textContent = text; el.classList.toggle("busy", busy);
+  }
+
+  // ---------- Viewer ----------
+  const stage = $("#stage"), frame = $("#frame"), cvA = $("#cvAfter"), cvB = $("#cvBefore");
+  function applySplit() {
+    const pos = state.view === "before" ? 1 : state.view === "after" ? 0 : state.split;
+    cvA.style.clipPath = `inset(0 0 0 ${pos * 100}%)`;
+    $("#divider").style.left = (state.split * 100) + "%";
+    $("#divider").hidden = state.view !== "split";
+    $("#tagL").hidden = state.view === "after";
+    $("#tagR").hidden = state.view === "before";
+    $("#knob").setAttribute("aria-valuenow", String(Math.round(state.split * 100)));
+  }
+  function layoutFrame() {
+    const W = cvA.width, H = cvA.height; if (!W || !H) return;
+    let w, h;
+    if (state.zoom === "fit") {
+      const s = Math.min((stage.clientWidth - 24) / W, (stage.clientHeight - 24) / H);
+      w = W * s; h = H * s;
+    } else { w = W / state.previewScale; h = H / state.previewScale; }
+    frame.style.width = Math.max(1, Math.round(w)) + "px";
+    frame.style.height = Math.max(1, Math.round(h)) + "px";
+  }
+  new ResizeObserver(() => layoutFrame()).observe(stage);
+
+  let dragging = false;
+  function splitFromEvent(e) {
+    const r = frame.getBoundingClientRect();
+    state.split = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
+    if (state.view !== "split") { state.view = "split"; setPressed(document.querySelector('[aria-label="View"]'), "view", "split"); }
+    applySplit();
+  }
+  frame.addEventListener("pointerdown", e => {
+    if (e.pointerType !== "mouse" && e.target !== $("#knob")) return;
+    dragging = true; frame.setPointerCapture(e.pointerId); splitFromEvent(e); e.preventDefault();
+  });
+  frame.addEventListener("pointermove", e => { if (dragging) splitFromEvent(e); });
+  frame.addEventListener("pointerup", () => { dragging = false; });
+  frame.addEventListener("pointercancel", () => { dragging = false; });
+  $("#knob").addEventListener("keydown", e => {
+    const step = e.shiftKey ? 0.1 : 0.02;
+    if (e.key === "ArrowLeft") state.split = Math.max(0, state.split - step);
+    else if (e.key === "ArrowRight") state.split = Math.min(1, state.split + step);
+    else return;
+    e.preventDefault(); applySplit();
+  });
+
+  // ---------- Histogram ----------
+  function cssVar(n) { return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
+  function drawHist() {
+    const c = $("#hist"), dpr = window.devicePixelRatio || 1;
+    const w = c.clientWidth, h = c.clientHeight; if (!w || !state.hist) return;
+    c.width = Math.round(w * dpr); c.height = Math.round(h * dpr);
+    const ctx = c.getContext("2d"); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, w, h);
+    ctx.strokeStyle = cssVar("--line"); ctx.lineWidth = 1;
+    for (const f of [0.25, 0.5, 0.75]) { ctx.beginPath(); ctx.moveTo(Math.round(w * f) + 0.5, 0); ctx.lineTo(Math.round(w * f) + 0.5, h); ctx.stroke(); }
+    const curve = hs => {
+      let m = 1; for (let i = 1; i < 255; i++) m = Math.max(m, hs[i]);
+      const pts = []; for (let i = 0; i < 256; i++) pts.push([i / 255 * w, h - 2 - Math.sqrt(Math.min(1, hs[i] / m)) * (h - 6)]);
+      return pts;
+    };
+    const after = curve(state.hist.after), before = curve(state.hist.before), accent = cssVar("--accent");
+    ctx.beginPath(); ctx.moveTo(0, h); after.forEach(([x, y]) => ctx.lineTo(x, y)); ctx.lineTo(w, h); ctx.closePath();
+    ctx.globalAlpha = 0.35; ctx.fillStyle = accent; ctx.fill(); ctx.globalAlpha = 1;
+    ctx.strokeStyle = accent; ctx.lineWidth = 1.5; ctx.beginPath(); after.forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); ctx.stroke();
+    ctx.strokeStyle = cssVar("--muted"); ctx.setLineDash([4, 3]); ctx.lineWidth = 1.25;
+    ctx.beginPath(); before.forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); ctx.stroke(); ctx.setLineDash([]);
+  }
+  window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", drawHist);
+  new MutationObserver(drawHist).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+  new ResizeObserver(drawHist).observe($("#hist"));
+
+  // ---------- Diagnosis → automatic settings ----------
+  function castName(cb, cr) {
+    const a = Math.atan2(cr, cb) * 180 / Math.PI;
+    const names = [[-157.5, "yellow"], [-112.5, "yellow-green"], [-67.5, "green"], [-22.5, "cyan"], [22.5, "blue"], [67.5, "purple"], [112.5, "red"], [157.5, "orange"], [181, "yellow"]];
+    for (const [lim, n] of names) if (a < lim) return n;
+    return "yellow";
+  }
+  function describe(a) {
+    const cast = Math.hypot(a.cb, a.cr), range = a.p99 - a.p1;
+    return [
+      ["Noise", a.sigma < 2.5 ? "Low" : a.sigma < 6 ? "Moderate" : "Heavy", a.sigma >= 2.5, `σ ${a.sigma.toFixed(1)}`],
+      a.sigma >= 6 ? ["Detail", "Hidden by noise", true, "–"] : ["Detail", a.sharpRatio < 0.45 ? "Soft" : a.sharpRatio < 0.65 ? "Slightly soft" : "Crisp", a.sharpRatio < 0.65, `${a.sharpRatio.toFixed(2)}`],
+      ["Color cast", cast < 0.02 ? "Neutral" : `${castName(a.cb, a.cr)[0].toUpperCase()}${castName(a.cb, a.cr).slice(1)}`, cast >= 0.02, `Δ ${(cast * 100).toFixed(1)}`],
+      ["Exposure", a.median < 0.3 ? "Dark" : a.median > 0.7 ? "Bright" : "Balanced", a.median < 0.3 || a.median > 0.7, `${Math.round(a.median * 100)}%`],
+      ["Contrast", range < 0.6 ? "Flat" : range < 0.82 ? "Low" : "Full", range < 0.82, `${Math.round(range * 100)}%`],
+      ["Size", `${state.src.w} × ${state.src.h}`, Math.max(state.src.w, state.src.h) < 1400, `${(state.src.w * state.src.h / 1e6).toFixed(1)} MP`]
+    ];
+  }
+  function autoParams(a) {
+    const c = (v, lo, hi) => Math.round(Math.min(hi, Math.max(lo, v)));
+    const cast = Math.hypot(a.cb, a.cr), range = a.p99 - a.p1;
+    const denoise = c((a.sigma - 1.2) * 11, 0, 85);
+    let sharpen = a.sharpRatio < 0.45 ? 70 : a.sharpRatio < 0.65 ? 50 : 30;
+    if (denoise > 40) sharpen = Math.min(sharpen, 30);
+    const side = Math.max(state.src.w, state.src.h);
+    return {
+      denoise, sharpen,
+      tone: range < 0.82 ? 100 : 70,
+      exposure: a.median < 0.25 ? 0.4 : a.median > 0.72 ? -0.3 : 0,
+      shadows: c((0.45 - a.median) * 180, 0, 60),
+      clarity: range < 0.6 ? 35 : 22,
+      wb: c(cast * 2200, 20, 100),
+      warmth: 0,
+      color: a.chroma < 0.06 ? 25 : 12,
+      up: side <= 640 ? 4 : side <= 1400 ? 2 : 1
+    };
+  }
+  function renderDiag() {
+    const dl = $("#diag"); dl.innerHTML = "";
+    for (const [name, label, fix, num] of describe(state.analysis)) {
+      const dt = document.createElement("dt"); dt.textContent = name;
+      const dd = document.createElement("dd");
+      const chip = document.createElement("span"); chip.className = "chip" + (fix ? " fix" : ""); chip.textContent = label;
+      chip.title = fix ? "Will be corrected" : "Looks fine";
+      const n = document.createElement("span"); n.className = "num"; n.textContent = num;
+      dd.append(chip, n); dl.append(dt, dd);
+    }
+  }
+
+  // ---------- Loading ----------
+  async function loadSource(img, name, label) {
+    let w = img.naturalWidth || img.width, h = img.naturalHeight || img.height;
+    const k = Math.min(1, SOURCE_MAX_SIDE / Math.max(w, h));
+    w = Math.round(w * k); h = Math.round(h * k);
+    const c = document.createElement("canvas"); c.width = w; c.height = h;
+    const ctx = c.getContext("2d", { willReadFrequently: true });
+    ctx.imageSmoothingQuality = "high"; ctx.drawImage(img, 0, 0, w, h);
+    state.srcCanvas = c; state.srcData = ctx.getImageData(0, 0, w, h); state.previewCache = null;
+    state.src = { w, h, name };
+    $("#fileInfo").textContent = label || name;
+    $("#fileInfo").title = name;
+    $("#dropHint").hidden = true; frame.hidden = false;
+    setStatus("Analyzing…", true);
+    state.analysis = await call({ type: "analyze", w, h, data: new Uint8ClampedArray(state.srcData.data) });
+    const auto = autoParams(state.analysis);
+    state.up = auto.up; delete auto.up; state.auto = auto;
+    renderDiag(); updateUpscale();
+    setPreset("auto");
+  }
+  async function loadFile(file) {
+    if (!file) return;
+    if (file.type && !file.type.startsWith("image/")) { setStatus("That file is not an image. Choose a JPEG, PNG or WebP photo."); return; }
+    try {
+      let img;
+      try { img = await createImageBitmap(file, { imageOrientation: "from-image" }); }
+      catch { img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = URL.createObjectURL(file); }); }
+      await loadSource(img, file.name);
+    } catch (err) {
+      setStatus("This browser can't read that file. Try a JPEG, PNG or WebP.");
+    }
+  }
+  $("#file").addEventListener("change", e => { loadFile(e.target.files[0]); e.target.value = ""; });
+  ["dragenter", "dragover"].forEach(t => document.addEventListener(t, e => { e.preventDefault(); stage.classList.add("drag"); }));
+  ["dragleave", "drop"].forEach(t => document.addEventListener(t, e => { e.preventDefault(); if (t === "drop" || e.target === document.documentElement) stage.classList.remove("drag"); }));
+  document.addEventListener("drop", e => { stage.classList.remove("drag"); loadFile(e.dataTransfer && e.dataTransfer.files[0]); });
+  document.addEventListener("paste", e => {
+    const f = [...(e.clipboardData && e.clipboardData.files || [])].find(f => f.type.startsWith("image/"));
+    if (f) loadFile(f);
+  });
+
+  // ---------- Rendering ----------
+  let busy = false, dirty = false, timer = 0;
+  function requestRender(delay = 110) { clearTimeout(timer); timer = setTimeout(renderPreview, delay); }
+  function previewInput() {
+    const s = state.src, out = s.w * s.h * state.up * state.up;
+    if (out <= PREVIEW_MAX) return { w: s.w, h: s.h, data: state.srcData.data, rs: 1 };
+    const p = Math.sqrt(PREVIEW_MAX / out), w = Math.max(1, Math.round(s.w * p)), h = Math.max(1, Math.round(s.h * p));
+    if (!state.previewCache || state.previewCache.w !== w || state.previewCache.h !== h) {
+      const c = document.createElement("canvas"); c.width = w; c.height = h;
+      const ctx = c.getContext("2d", { willReadFrequently: true }); ctx.imageSmoothingQuality = "high";
+      ctx.drawImage(state.srcCanvas, 0, 0, w, h);
+      state.previewCache = { w, h, data: ctx.getImageData(0, 0, w, h).data };
+    }
+    return { w, h, data: state.previewCache.data, rs: p };
+  }
+  async function renderPreview() {
+    if (!state.src) return;
+    if (busy) { dirty = true; return; }
+    busy = true; setStatus("Processing…", true);
+    const inp = previewInput(), t0 = performance.now();
+    try {
+      const r = await call({ type: "process", w: inp.w, h: inp.h, data: new Uint8ClampedArray(inp.data), P: { ...state.params }, up: state.up, rs: inp.rs });
+      state.previewScale = inp.rs;
+      cvA.width = r.W; cvA.height = r.H;
+      cvA.getContext("2d").putImageData(new ImageData(r.out, r.W, r.H), 0, 0);
+      cvB.width = r.W; cvB.height = r.H;
+      const bctx = cvB.getContext("2d"); bctx.imageSmoothingEnabled = true; bctx.imageSmoothingQuality = "low";
+      bctx.drawImage(state.srcCanvas, 0, 0, r.W, r.H);
+      layoutFrame(); applySplit();
+      state.hist = { before: r.histBefore, after: r.histAfter }; drawHist();
+      const ms = Math.round(performance.now() - t0);
+      setStatus(`${r.W} × ${r.H} px in ${ms} ms` + (inp.rs < 1 ? ` · preview at ${Math.round(inp.rs * 100)}%` : ""));
+    } catch (err) {
+      setStatus("Processing failed: " + err.message);
+    }
+    busy = false;
+    if (dirty) { dirty = false; renderPreview(); }
+  }
+
+  // ---------- Saving ----------
+  $("#saveBtn").addEventListener("click", async () => {
+    if (!state.src) return;
+    const btn = $("#saveBtn"), msg = $("#saveStatus");
+    btn.disabled = true; msg.textContent = "Rendering full size…";
+    try {
+      const s = state.src;
+      const r = await call({ type: "process", w: s.w, h: s.h, data: new Uint8ClampedArray(state.srcData.data), P: { ...state.params }, up: state.up, rs: 1 });
+      const c = document.createElement("canvas"); c.width = r.W; c.height = r.H;
+      c.getContext("2d").putImageData(new ImageData(r.out, r.W, r.H), 0, 0);
+      const png = state.fmt === "png";
+      const blob = await new Promise(res => c.toBlob(res, png ? "image/png" : "image/jpeg", 0.92));
+      const base = s.name.replace(/\.[a-z0-9]+$/i, "") || "photo";
+      const filename = `${base}-enhanced.${png ? "png" : "jpg"}`;
+      const dl = await downloadsReady;
+      if (dl) {
+        try { await dl.save({ filename, data: blob }); msg.textContent = `Saved ${filename} (${r.W} × ${r.H} px).`; }
+        catch (err) {
+          if (err && err.code === "declined") msg.textContent = "Save cancelled.";
+          else if (err && err.code === "rate_limited") msg.textContent = "A save prompt is already open.";
+          else showSheet(blob, msg);
+        }
+      } else if (window.claude) {
+        showSheet(blob, msg);
+      } else {
+        const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = filename;
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(a.href), 30000);
+        msg.textContent = `Downloaded ${filename} (${r.W} × ${r.H} px).`;
+      }
+    } catch (err) {
+      msg.textContent = "Couldn't render the photo: " + err.message;
+    }
+    btn.disabled = false;
+  });
+  function showSheet(blob, msg) {
+    $("#sheetImg").src = URL.createObjectURL(blob);
+    $("#sheet").hidden = false;
+    msg.textContent = "Downloads are blocked here. Save the image from the preview.";
+  }
+  $("#sheetClose").addEventListener("click", () => { $("#sheet").hidden = true; URL.revokeObjectURL($("#sheetImg").src); });
+
+  // ---------- Sample photo: a Greek harbour scene, deliberately degraded ----------
+  function rng(seed) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+  function drawScene(ctx, W, H) {
+    const R = rng(7);
+    let g = ctx.createLinearGradient(0, 0, 0, H * 0.5);
+    g.addColorStop(0, "#2f74c0"); g.addColorStop(1, "#c4e2f6");
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    g = ctx.createRadialGradient(W * 0.82, H * 0.14, 4, W * 0.82, H * 0.14, 90);
+    g.addColorStop(0, "rgba(255,250,225,1)"); g.addColorStop(0.25, "rgba(255,244,200,.9)"); g.addColorStop(1, "rgba(255,244,200,0)");
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = "#8d9f9a"; ctx.beginPath(); ctx.moveTo(0, H * 0.5);
+    for (let x = 0; x <= W; x += 10) ctx.lineTo(x, H * 0.5 - 22 - 18 * Math.sin(x / 70) - 10 * Math.sin(x / 23 + 1));
+    ctx.lineTo(W, H * 0.5); ctx.fill();
+    g = ctx.createLinearGradient(0, H * 0.5, 0, H);
+    g.addColorStop(0, "#2a7fb8"); g.addColorStop(1, "#0b456f");
+    ctx.fillStyle = g; ctx.fillRect(0, H * 0.5, W, H * 0.5);
+    ctx.strokeStyle = "rgba(255,255,255,.45)"; ctx.lineWidth = 1.5;
+    for (let i = 0; i < 220; i++) { const x = R() * W, y = H * 0.52 + R() * H * 0.48, l = 6 + R() * 22 * (y / H); ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + l, y); ctx.stroke(); }
+    // Fishing boat
+    ctx.fillStyle = "#c8372d"; ctx.beginPath(); ctx.moveTo(W * 0.56, H * 0.72); ctx.lineTo(W * 0.74, H * 0.72); ctx.lineTo(W * 0.71, H * 0.79); ctx.lineTo(W * 0.585, H * 0.79); ctx.fill();
+    ctx.fillStyle = "#f5f2ea"; ctx.fillRect(W * 0.565, H * 0.722, W * 0.17, 5);
+    ctx.fillStyle = "#1f5aa6"; ctx.fillRect(W * 0.61, H * 0.66, W * 0.05, H * 0.06);
+    ctx.strokeStyle = "#3b2a1a"; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(W * 0.68, H * 0.72); ctx.lineTo(W * 0.68, H * 0.55); ctx.stroke();
+    // Cliff with whitewashed houses
+    ctx.fillStyle = "#b9a184"; ctx.beginPath(); ctx.moveTo(0, H * 0.36); ctx.lineTo(W * 0.3, H * 0.42); ctx.lineTo(W * 0.46, H * 0.62); ctx.lineTo(W * 0.5, H); ctx.lineTo(0, H); ctx.fill();
+    const houses = [[0.02, 0.33, 0.12, 0.13], [0.15, 0.37, 0.1, 0.11], [0.05, 0.5, 0.14, 0.14], [0.21, 0.5, 0.11, 0.12], [0.33, 0.6, 0.1, 0.1], [0.0, 0.68, 0.16, 0.16], [0.18, 0.66, 0.13, 0.14], [0.32, 0.73, 0.12, 0.12]];
+    for (const [x, y, w, h] of houses) {
+      const X = x * W, Y = y * H, Wd = w * W, Hd = h * H;
+      ctx.fillStyle = "#f6f4ee"; ctx.fillRect(X, Y, Wd, Hd);
+      ctx.fillStyle = "#d8d4ca"; ctx.fillRect(X + Wd * 0.82, Y, Wd * 0.18, Hd);
+      ctx.fillStyle = "#1f5aa6"; ctx.fillRect(X + Wd * 0.12, Y + Hd * 0.45, Wd * 0.16, Hd * 0.55);
+      ctx.fillRect(X + Wd * 0.45, Y + Hd * 0.25, Wd * 0.14, Hd * 0.2); ctx.fillRect(X + Wd * 0.62, Y + Hd * 0.25, Wd * 0.14, Hd * 0.2);
+      ctx.strokeStyle = "#f6f4ee"; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(X + Wd * 0.52, Y + Hd * 0.25); ctx.lineTo(X + Wd * 0.52, Y + Hd * 0.45); ctx.stroke();
+    }
+    // Chapel dome
+    ctx.fillStyle = "#f6f4ee"; ctx.fillRect(W * 0.17, H * 0.22, W * 0.09, H * 0.15);
+    ctx.fillStyle = "#1d55a8"; ctx.beginPath(); ctx.arc(W * 0.215, H * 0.22, W * 0.045, Math.PI, 0); ctx.fill();
+    ctx.strokeStyle = "#f6f4ee"; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(W * 0.215, H * 0.22 - W * 0.045); ctx.lineTo(W * 0.215, H * 0.22 - W * 0.065); ctx.moveTo(W * 0.205, H * 0.22 - W * 0.057); ctx.lineTo(W * 0.225, H * 0.22 - W * 0.057); ctx.stroke();
+    // Bougainvillea
+    for (let i = 0; i < 260; i++) { ctx.fillStyle = R() > 0.3 ? "#d6337f" : "#3f7a35"; const x = W * (0.14 + R() * 0.07), y = H * (0.6 + R() * 0.1); ctx.beginPath(); ctx.arc(x, y, 2 + R() * 3, 0, 7); ctx.fill(); }
+    // Café sign
+    ctx.fillStyle = "#1f5aa6"; ctx.fillRect(W * 0.02, H * 0.86, W * 0.2, H * 0.07);
+    ctx.fillStyle = "#ffffff"; ctx.font = `600 ${Math.round(H * 0.045)}px Georgia, serif`; ctx.textBaseline = "middle";
+    ctx.fillText("ΚΑΦΕΝΕΙΟ", W * 0.032, H * 0.897);
+  }
+  async function loadSample() {
+    const big = document.createElement("canvas"); big.width = 1200; big.height = 800;
+    drawScene(big.getContext("2d"), 1200, 800);
+    const w = 420, h = 280, small = document.createElement("canvas"); small.width = w; small.height = h;
+    const sctx = small.getContext("2d", { willReadFrequently: true }); sctx.imageSmoothingQuality = "medium";
+    sctx.drawImage(big, 0, 0, w, h);
+    const id = sctx.getImageData(0, 0, w, h), d = id.data, R = rng(42);
+    const gauss = () => Math.sqrt(-2 * Math.log(R() + 1e-9)) * Math.cos(2 * Math.PI * R());
+    for (let i = 0; i < d.length; i += 4) {
+      const n = gauss() * 10;
+      let r = d[i] / 255, g = d[i + 1] / 255, b = d[i + 2] / 255;
+      r = Math.pow(0.16 + 0.6 * r, 1.3) * 1.08 + 0.02; g = Math.pow(0.16 + 0.6 * g, 1.3) * 1.0; b = Math.pow(0.16 + 0.6 * b, 1.3) * 0.74;
+      d[i] = r * 255 + n + gauss() * 6; d[i + 1] = g * 255 + n + gauss() * 6; d[i + 2] = b * 255 + n + gauss() * 6;
+    }
+    sctx.putImageData(id, 0, 0);
+    const img = new Image();
+    await new Promise(res => { img.onload = res; img.src = small.toDataURL("image/jpeg", 0.35); });
+    await loadSource(img, "harbour-sample.jpg", "Sample photo");
+  }
+  $("#sampleBtn").addEventListener("click", loadSample);
+
+  syncControls(); applySplit();
+  loadSample();
+})();
+</script>
+<!-- ARTIFACT-END -->
+</body>
+</html>
