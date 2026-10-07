@@ -17,4 +17,6 @@ It diagnoses the photo (noise, softness, color cast, exposure, contrast, size) a
 - **Vibrance and warmth**
 - **Upscale** 2× or 4× (Catmull-Rom), followed by a noise-aware unsharp mask
 
-Presets cover old prints, low-light shots and blurry images. A split before/after view and a brightness histogram show the result, and the full-size image saves as JPEG or PNG.
+Presets cover old prints, low-light shots and blurry images. A split before/after view and a brightness histogram show the result.
+
+Add several photos at once (pick, drop or paste them). Each one is diagnosed separately and keeps its own settings in the photo strip. Save the current photo at full size as JPEG or PNG, or save all of them in one `.zip`.

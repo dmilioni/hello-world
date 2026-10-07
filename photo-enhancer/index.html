@@ -141,6 +141,22 @@ button, input, select { font: inherit; color: inherit; }
 .note { margin: 0; font-size: 12px; color: var(--muted); }
 .mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 
+.strip { display: flex; gap: 10px; overflow-x: auto; padding-block: 8px 4px; padding-inline: 2px 8px; }
+.thumb { position: relative; flex: none; width: 104px; }
+.thumb .pick {
+  display: flex; flex-direction: column; gap: 4px; width: 100%; height: 100%; padding: 4px; text-align: left;
+  border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); cursor: pointer;
+}
+.thumb .pick:hover { border-color: var(--muted); }
+.thumb.on .pick { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.thumb img { display: block; width: 100%; height: 64px; object-fit: cover; border-radius: 3px; background: var(--stage); }
+.thumb span { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.thumb .rm {
+  position: absolute; top: -7px; right: -7px; width: 22px; height: 22px; padding: 0; border-radius: 50%;
+  border: 1px solid var(--line); background: var(--panel); cursor: pointer; font-size: 14px; line-height: 1;
+}
+.thumb .rm:hover { border-color: var(--fix); color: var(--fix); }
+.thumb.add .pick { align-items: center; justify-content: center; border-style: dashed; color: var(--muted); min-height: 92px; font-size: 12px; text-align: center; }
 .hist { width: 100%; height: 76px; display: block; }
 .legend { display: flex; gap: 14px; font-size: 12px; color: var(--muted); }
 .legend span::before { content: ""; display: inline-block; width: 14px; height: 0; vertical-align: middle; margin-right: 6px; }
@@ -155,11 +171,11 @@ button, input, select { font: inherit; color: inherit; }
 <header class="top">
   <div class="brand">
     <h1>Snapshot Rescue</h1>
-    <p>Cleans up grainy, dull, small photos. Everything runs in your browser, so your photo never leaves this device.</p>
+    <p>Cleans up grainy, dull, small photos. Add as many as you like and save them all at once. Everything runs in your browser, so your photos never leave this device.</p>
   </div>
   <div class="actions">
-    <label class="btn primary" for="file">Open photo</label>
-    <input id="file" class="sr" type="file" accept="image/*">
+    <label class="btn primary" for="file">Add photos</label>
+    <input id="file" class="sr" type="file" accept="image/*" multiple>
     <button class="btn" id="sampleBtn" type="button">Load sample</button>
   </div>
 </header>
@@ -174,7 +190,7 @@ button, input, select { font: inherit; color: inherit; }
         <span class="tag l" id="tagL">Before</span>
         <span class="tag r" id="tagR">After</span>
       </div>
-      <div class="drop-hint" id="dropHint">Drop a photo here</div>
+      <div class="drop-hint" id="dropHint">Drop photos here</div>
     </div>
     <div class="toolbar">
       <div class="seg" role="group" aria-label="View">
@@ -188,7 +204,8 @@ button, input, select { font: inherit; color: inherit; }
       </div>
       <span class="status" id="status" aria-live="polite"></span>
     </div>
-    <p class="note">Drag the divider to compare. You can also drop or paste a photo anywhere on the page.</p>
+    <div class="strip" id="strip" role="group" aria-label="Your photos" hidden></div>
+    <p class="note">Drag the divider to compare. You can also drop or paste photos anywhere on the page. Each photo keeps its own settings.</p>
   </section>
 
   <aside class="panel">
@@ -231,7 +248,8 @@ button, input, select { font: inherit; color: inherit; }
         <button type="button" data-fmt="jpg" aria-pressed="true">JPEG</button>
         <button type="button" data-fmt="png" aria-pressed="false">PNG</button>
       </div>
-      <button class="btn primary" id="saveBtn" type="button">Save enhanced photo</button>
+      <button class="btn primary" id="saveBtn" type="button">Save this photo</button>
+      <button class="btn" id="saveAllBtn" type="button" hidden>Save all as .zip</button>
       <p class="note" id="saveStatus">Saves at full output size.</p>
     </div>
   </aside>
@@ -786,13 +804,15 @@ function processImage(m) {
       ["Size", `${state.src.w} × ${state.src.h}`, Math.max(state.src.w, state.src.h) < 1400, `${(state.src.w * state.src.h / 1e6).toFixed(1)} MP`]
     ];
   }
-  function autoParams(a) {
+  function autoParams(a, w, h) {
     const c = (v, lo, hi) => Math.round(Math.min(hi, Math.max(lo, v)));
     const cast = Math.hypot(a.cb, a.cr), range = a.p99 - a.p1;
     const denoise = c((a.sigma - 1.2) * 11, 0, 85);
     let sharpen = a.sharpRatio < 0.45 ? 70 : a.sharpRatio < 0.65 ? 50 : 30;
     if (denoise > 40) sharpen = Math.min(sharpen, 30);
-    const side = Math.max(state.src.w, state.src.h);
+    const side = Math.max(w, h);
+    let up = side <= 640 ? 4 : side <= 1400 ? 2 : 1;
+    while (up > 1 && w * h * up * up > EXPORT_MAX) up /= 2;
     return {
       denoise, sharpen,
       tone: range < 0.82 ? 100 : 70,
@@ -802,7 +822,7 @@ function processImage(m) {
       wb: c(cast * 2200, 20, 100),
       warmth: 0,
       color: a.chroma < 0.06 ? 25 : 12,
-      up: side <= 640 ? 4 : side <= 1400 ? 2 : 1
+      up
     };
   }
   function renderDiag() {
@@ -817,45 +837,123 @@ function processImage(m) {
     }
   }
 
-  // ---------- Loading ----------
-  async function loadSource(img, name, label) {
+  // ---------- Photos ----------
+  // The active photo's fields live on `state`; the others keep theirs on their own photo object.
+  const PHOTO_KEYS = ["src", "srcCanvas", "srcData", "analysis", "auto", "params", "preset", "up", "previewCache"];
+  const photos = [];
+  let current = null;
+  function stash() { if (current) for (const k of PHOTO_KEYS) current[k] = state[k]; }
+  function pixelsOf(p) {
+    return p.srcData || p.srcCanvas.getContext("2d", { willReadFrequently: true }).getImageData(0, 0, p.src.w, p.src.h);
+  }
+  function activate(p) {
+    stash();
+    if (current && current !== p) { current.srcData = null; current.previewCache = null; }
+    current = p;
+    p.srcData = pixelsOf(p);
+    for (const k of PHOTO_KEYS) state[k] = p[k];
+    $("#fileInfo").textContent = p.label || p.src.name; $("#fileInfo").title = p.src.name;
+    $("#dropHint").hidden = true; frame.hidden = false;
+    setPreset(state.preset, false);
+    syncControls(); renderDiag(); updateUpscale(); renderStrip();
+    requestRender(0);
+  }
+  function clearViewer() {
+    current = null;
+    Object.assign(state, { src: null, srcCanvas: null, srcData: null, analysis: null, auto: null, previewCache: null, params: { ...NEUTRAL }, preset: "auto", up: 2, hist: null });
+    frame.hidden = true; $("#dropHint").hidden = false;
+    $("#diag").innerHTML = ""; $("#fileInfo").textContent = ""; $("#outInfo").textContent = "";
+    const hc = $("#hist"); hc.getContext("2d").clearRect(0, 0, hc.width, hc.height);
+    syncControls(); renderStrip(); setStatus("");
+  }
+  async function addPhoto(img, name, opts = {}) {
     let w = img.naturalWidth || img.width, h = img.naturalHeight || img.height;
     const k = Math.min(1, SOURCE_MAX_SIDE / Math.max(w, h));
     w = Math.round(w * k); h = Math.round(h * k);
     const c = document.createElement("canvas"); c.width = w; c.height = h;
     const ctx = c.getContext("2d", { willReadFrequently: true });
     ctx.imageSmoothingQuality = "high"; ctx.drawImage(img, 0, 0, w, h);
-    state.srcCanvas = c; state.srcData = ctx.getImageData(0, 0, w, h); state.previewCache = null;
-    state.src = { w, h, name };
-    $("#fileInfo").textContent = label || name;
-    $("#fileInfo").title = name;
-    $("#dropHint").hidden = true; frame.hidden = false;
-    setStatus("Analyzing…", true);
-    state.analysis = await call({ type: "analyze", w, h, data: new Uint8ClampedArray(state.srcData.data) });
-    const auto = autoParams(state.analysis);
-    state.up = auto.up; delete auto.up; state.auto = auto;
-    renderDiag(); updateUpscale();
-    setPreset("auto");
+    const p = { src: { w, h, name }, srcCanvas: c, srcData: ctx.getImageData(0, 0, w, h), previewCache: null, label: opts.label, sample: !!opts.sample };
+    p.analysis = await call({ type: "analyze", w, h, data: new Uint8ClampedArray(p.srcData.data) });
+    const auto = autoParams(p.analysis, w, h);
+    p.up = auto.up; delete auto.up;
+    p.auto = auto; p.params = { ...auto }; p.preset = "auto";
+    const ts = Math.min(1, 160 / Math.max(w, h)), t = document.createElement("canvas");
+    t.width = Math.max(1, Math.round(w * ts)); t.height = Math.max(1, Math.round(h * ts));
+    const tctx = t.getContext("2d"); tctx.imageSmoothingQuality = "high"; tctx.drawImage(c, 0, 0, t.width, t.height);
+    p.thumb = t.toDataURL("image/jpeg", 0.8);
+    if (current) p.srcData = null; // rebuilt from the canvas when this photo is opened
+    photos.push(p);
+    return p;
   }
-  async function loadFile(file) {
-    if (!file) return;
-    if (file.type && !file.type.startsWith("image/")) { setStatus("That file is not an image. Choose a JPEG, PNG or WebP photo."); return; }
-    try {
-      let img;
-      try { img = await createImageBitmap(file, { imageOrientation: "from-image" }); }
-      catch { img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = URL.createObjectURL(file); }); }
-      await loadSource(img, file.name);
-    } catch (err) {
-      setStatus("This browser can't read that file. Try a JPEG, PNG or WebP.");
+  function removePhoto(p) {
+    const i = photos.indexOf(p); if (i < 0) return;
+    photos.splice(i, 1);
+    if (p !== current) { renderStrip(); return; }
+    current = null;
+    const next = photos[Math.min(i, photos.length - 1)];
+    next ? activate(next) : clearViewer();
+  }
+  function renderStrip() {
+    const strip = $("#strip"); strip.innerHTML = "";
+    strip.hidden = photos.length === 0;
+    const all = $("#saveAllBtn");
+    all.hidden = photos.length < 2;
+    all.textContent = `Save all ${photos.length} as .zip`;
+    for (const p of photos) {
+      const item = document.createElement("div"); item.className = "thumb" + (p === current ? " on" : "");
+      const pick = document.createElement("button"); pick.type = "button"; pick.className = "pick"; pick.title = p.src.name;
+      pick.setAttribute("aria-pressed", String(p === current));
+      const im = document.createElement("img"); im.src = p.thumb; im.alt = "";
+      const cap = document.createElement("span"); cap.textContent = p.label || p.src.name;
+      pick.append(im, cap);
+      pick.addEventListener("click", () => { if (p !== current) activate(p); });
+      const rm = document.createElement("button"); rm.type = "button"; rm.className = "rm"; rm.textContent = "×";
+      rm.setAttribute("aria-label", "Remove " + (p.label || p.src.name));
+      rm.addEventListener("click", () => removePhoto(p));
+      item.append(pick, rm); strip.append(item);
+    }
+    const add = document.createElement("div"); add.className = "thumb add";
+    const ab = document.createElement("button"); ab.type = "button"; ab.className = "pick"; ab.textContent = "+ Add photos";
+    ab.addEventListener("click", () => $("#file").click());
+    add.append(ab); strip.append(add);
+  }
+
+  // ---------- Loading ----------
+  async function decode(file) {
+    try { return await createImageBitmap(file, { imageOrientation: "from-image" }); }
+    catch {
+      return await new Promise((res, rej) => {
+        const i = new Image(), url = URL.createObjectURL(file);
+        i.onload = () => { URL.revokeObjectURL(url); res(i); }; i.onerror = rej; i.src = url;
+      });
     }
   }
-  $("#file").addEventListener("change", e => { loadFile(e.target.files[0]); e.target.value = ""; });
+  async function loadFiles(list) {
+    const files = [...(list || [])].filter(f => !f.type || f.type.startsWith("image/"));
+    if (!files.length) { setStatus("No photos found. Choose JPEG, PNG or WebP files."); return; }
+    const sample = photos.find(p => p.sample);
+    const failed = []; let added = 0;
+    for (let i = 0; i < files.length; i++) {
+      if (files.length > 1) setStatus(`Opening ${i + 1} of ${files.length}…`, true);
+      try {
+        const img = await decode(files[i]);
+        const p = await addPhoto(img, files[i].name);
+        if (img.close) img.close();
+        if (!added++) { activate(p); if (sample) removePhoto(sample); }
+        else renderStrip();
+      } catch { failed.push(files[i].name); }
+    }
+    if (failed.length) setStatus(`Couldn't read ${failed.join(", ")}. Try JPEG, PNG or WebP.`);
+    else if (files.length > 1) requestRender(0);
+  }
+  $("#file").addEventListener("change", e => { loadFiles(e.target.files); e.target.value = ""; });
   ["dragenter", "dragover"].forEach(t => document.addEventListener(t, e => { e.preventDefault(); stage.classList.add("drag"); }));
   ["dragleave", "drop"].forEach(t => document.addEventListener(t, e => { e.preventDefault(); if (t === "drop" || e.target === document.documentElement) stage.classList.remove("drag"); }));
-  document.addEventListener("drop", e => { stage.classList.remove("drag"); loadFile(e.dataTransfer && e.dataTransfer.files[0]); });
+  document.addEventListener("drop", e => { stage.classList.remove("drag"); loadFiles(e.dataTransfer && e.dataTransfer.files); });
   document.addEventListener("paste", e => {
-    const f = [...(e.clipboardData && e.clipboardData.files || [])].find(f => f.type.startsWith("image/"));
-    if (f) loadFile(f);
+    const f = [...(e.clipboardData && e.clipboardData.files || [])].filter(f => f.type.startsWith("image/"));
+    if (f.length) loadFiles(f);
   });
 
   // ---------- Rendering ----------
@@ -877,19 +975,21 @@ function processImage(m) {
     if (!state.src) return;
     if (busy) { dirty = true; return; }
     busy = true; setStatus("Processing…", true);
-    const inp = previewInput(), t0 = performance.now();
+    const photo = current, srcCanvas = state.srcCanvas, inp = previewInput(), t0 = performance.now();
     try {
       const r = await call({ type: "process", w: inp.w, h: inp.h, data: new Uint8ClampedArray(inp.data), P: { ...state.params }, up: state.up, rs: inp.rs });
-      state.previewScale = inp.rs;
-      cvA.width = r.W; cvA.height = r.H;
-      cvA.getContext("2d").putImageData(new ImageData(r.out, r.W, r.H), 0, 0);
-      cvB.width = r.W; cvB.height = r.H;
-      const bctx = cvB.getContext("2d"); bctx.imageSmoothingEnabled = true; bctx.imageSmoothingQuality = "low";
-      bctx.drawImage(state.srcCanvas, 0, 0, r.W, r.H);
-      layoutFrame(); applySplit();
-      state.hist = { before: r.histBefore, after: r.histAfter }; drawHist();
-      const ms = Math.round(performance.now() - t0);
-      setStatus(`${r.W} × ${r.H} px in ${ms} ms` + (inp.rs < 1 ? ` · preview at ${Math.round(inp.rs * 100)}%` : ""));
+      if (photo === current) {
+        state.previewScale = inp.rs;
+        cvA.width = r.W; cvA.height = r.H;
+        cvA.getContext("2d").putImageData(new ImageData(r.out, r.W, r.H), 0, 0);
+        cvB.width = r.W; cvB.height = r.H;
+        const bctx = cvB.getContext("2d"); bctx.imageSmoothingEnabled = true; bctx.imageSmoothingQuality = "low";
+        bctx.drawImage(srcCanvas, 0, 0, r.W, r.H);
+        layoutFrame(); applySplit();
+        state.hist = { before: r.histBefore, after: r.histAfter }; drawHist();
+        const ms = Math.round(performance.now() - t0);
+        setStatus(`${r.W} × ${r.H} px in ${ms} ms` + (inp.rs < 1 ? ` · preview at ${Math.round(inp.rs * 100)}%` : ""));
+      } else dirty = true;
     } catch (err) {
       setStatus("Processing failed: " + err.message);
     }
@@ -898,46 +998,116 @@ function processImage(m) {
   }
 
   // ---------- Saving ----------
+  async function renderFull(p) {
+    const P = p === current ? state : p, s = P.src;
+    const r = await call({ type: "process", w: s.w, h: s.h, data: new Uint8ClampedArray(pixelsOf(P).data), P: { ...P.params }, up: P.up, rs: 1 });
+    const c = document.createElement("canvas"); c.width = r.W; c.height = r.H;
+    c.getContext("2d").putImageData(new ImageData(r.out, r.W, r.H), 0, 0);
+    const png = state.fmt === "png";
+    const blob = await new Promise(res => c.toBlob(res, png ? "image/png" : "image/jpeg", 0.92));
+    const base = s.name.replace(/\.[a-z0-9]+$/i, "") || "photo";
+    return { blob, W: r.W, H: r.H, filename: `${base}-enhanced.${png ? "png" : "jpg"}` };
+  }
+  // Hands a file to the viewer. Returns "saved", "declined", "busy", "sheet" or "blocked".
+  async function offer(blob, filename, isImage) {
+    const dl = await downloadsReady;
+    if (dl) {
+      try { await dl.save({ filename, data: blob }); return "saved"; }
+      catch (err) {
+        if (err && err.code === "declined") return "declined";
+        if (err && err.code === "rate_limited") return "busy";
+      }
+    } else if (!window.claude) {
+      const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = filename;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 30000);
+      return "saved";
+    }
+    if (!isImage) return "blocked";
+    $("#sheetImg").src = URL.createObjectURL(blob);
+    $("#sheet").hidden = false;
+    return "sheet";
+  }
+  const OFFER_MSG = {
+    declined: "Save cancelled.",
+    busy: "A save prompt is already open.",
+    sheet: "Downloads are blocked here. Save the image from the preview.",
+    blocked: "Downloads are blocked here. Save photos one at a time instead."
+  };
+  function setSaving(on) { $("#saveBtn").disabled = on; $("#saveAllBtn").disabled = on; }
   $("#saveBtn").addEventListener("click", async () => {
     if (!state.src) return;
-    const btn = $("#saveBtn"), msg = $("#saveStatus");
-    btn.disabled = true; msg.textContent = "Rendering full size…";
+    const msg = $("#saveStatus");
+    setSaving(true); msg.textContent = "Rendering full size…";
     try {
-      const s = state.src;
-      const r = await call({ type: "process", w: s.w, h: s.h, data: new Uint8ClampedArray(state.srcData.data), P: { ...state.params }, up: state.up, rs: 1 });
-      const c = document.createElement("canvas"); c.width = r.W; c.height = r.H;
-      c.getContext("2d").putImageData(new ImageData(r.out, r.W, r.H), 0, 0);
-      const png = state.fmt === "png";
-      const blob = await new Promise(res => c.toBlob(res, png ? "image/png" : "image/jpeg", 0.92));
-      const base = s.name.replace(/\.[a-z0-9]+$/i, "") || "photo";
-      const filename = `${base}-enhanced.${png ? "png" : "jpg"}`;
-      const dl = await downloadsReady;
-      if (dl) {
-        try { await dl.save({ filename, data: blob }); msg.textContent = `Saved ${filename} (${r.W} × ${r.H} px).`; }
-        catch (err) {
-          if (err && err.code === "declined") msg.textContent = "Save cancelled.";
-          else if (err && err.code === "rate_limited") msg.textContent = "A save prompt is already open.";
-          else showSheet(blob, msg);
-        }
-      } else if (window.claude) {
-        showSheet(blob, msg);
-      } else {
-        const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = filename;
-        document.body.appendChild(a); a.click(); a.remove();
-        setTimeout(() => URL.revokeObjectURL(a.href), 30000);
-        msg.textContent = `Downloaded ${filename} (${r.W} × ${r.H} px).`;
-      }
+      const r = await renderFull(current);
+      const res = await offer(r.blob, r.filename, true);
+      msg.textContent = res === "saved" ? `Saved ${r.filename} (${r.W} × ${r.H} px).` : OFFER_MSG[res];
     } catch (err) {
       msg.textContent = "Couldn't render the photo: " + err.message;
     }
-    btn.disabled = false;
+    setSaving(false);
   });
-  function showSheet(blob, msg) {
-    $("#sheetImg").src = URL.createObjectURL(blob);
-    $("#sheet").hidden = false;
-    msg.textContent = "Downloads are blocked here. Save the image from the preview.";
-  }
+  $("#saveAllBtn").addEventListener("click", async () => {
+    if (photos.length < 2) return;
+    const msg = $("#saveStatus"), list = photos.slice(), files = [], used = new Set();
+    stash(); setSaving(true);
+    try {
+      for (let i = 0; i < list.length; i++) {
+        msg.textContent = `Rendering ${i + 1} of ${list.length}…`;
+        const r = await renderFull(list[i]);
+        let name = r.filename, n = 2;
+        while (used.has(name)) name = r.filename.replace(/(\.[a-z]+)$/, `-${n++}$1`);
+        used.add(name);
+        files.push({ name, data: new Uint8Array(await r.blob.arrayBuffer()) });
+      }
+      msg.textContent = "Packing .zip…";
+      const zip = makeZip(files), filename = "enhanced-photos.zip";
+      const res = await offer(zip, filename, false);
+      msg.textContent = res === "saved" ? `Saved ${filename} with ${files.length} photos (${(zip.size / 1e6).toFixed(1)} MB).` : OFFER_MSG[res];
+    } catch (err) {
+      msg.textContent = "Couldn't render the photos: " + err.message;
+    }
+    setSaving(false);
+  });
   $("#sheetClose").addEventListener("click", () => { $("#sheet").hidden = true; URL.revokeObjectURL($("#sheetImg").src); });
+
+  // Minimal .zip writer (stored, no compression: JPEG and PNG are already compressed).
+  const CRC_TABLE = (() => {
+    const t = new Uint32Array(256);
+    for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; }
+    return t;
+  })();
+  function crc32(u8) {
+    let c = 0xFFFFFFFF;
+    for (let i = 0; i < u8.length; i++) c = CRC_TABLE[(c ^ u8[i]) & 0xFF] ^ (c >>> 8);
+    return (c ^ 0xFFFFFFFF) >>> 0;
+  }
+  function makeZip(files) {
+    const enc = new TextEncoder(), parts = [], central = [], d = new Date();
+    const time = (d.getHours() << 11) | (d.getMinutes() << 5) | (d.getSeconds() >> 1);
+    const date = ((d.getFullYear() - 1980) << 9) | ((d.getMonth() + 1) << 5) | d.getDate();
+    let offset = 0;
+    for (const f of files) {
+      const name = enc.encode(f.name), crc = crc32(f.data), size = f.data.length;
+      const lh = new DataView(new ArrayBuffer(30));
+      lh.setUint32(0, 0x04034b50, true); lh.setUint16(4, 20, true); lh.setUint16(6, 0x0800, true);
+      lh.setUint16(10, time, true); lh.setUint16(12, date, true); lh.setUint32(14, crc, true);
+      lh.setUint32(18, size, true); lh.setUint32(22, size, true); lh.setUint16(26, name.length, true);
+      parts.push(lh, name, f.data);
+      const ch = new DataView(new ArrayBuffer(46));
+      ch.setUint32(0, 0x02014b50, true); ch.setUint16(4, 20, true); ch.setUint16(6, 20, true); ch.setUint16(8, 0x0800, true);
+      ch.setUint16(12, time, true); ch.setUint16(14, date, true); ch.setUint32(16, crc, true);
+      ch.setUint32(20, size, true); ch.setUint32(24, size, true); ch.setUint16(28, name.length, true);
+      ch.setUint32(42, offset, true);
+      central.push(ch, name);
+      offset += 30 + name.length + size;
+    }
+    const cdSize = central.reduce((s, p) => s + p.byteLength, 0), end = new DataView(new ArrayBuffer(22));
+    end.setUint32(0, 0x06054b50, true); end.setUint16(8, files.length, true); end.setUint16(10, files.length, true);
+    end.setUint32(12, cdSize, true); end.setUint32(16, offset, true);
+    return new Blob([...parts, ...central, end], { type: "application/zip" });
+  }
 
   // ---------- Sample photo: a Greek harbour scene, deliberately degraded ----------
   function rng(seed) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
@@ -1001,9 +1171,13 @@ function processImage(m) {
     sctx.putImageData(id, 0, 0);
     const img = new Image();
     await new Promise(res => { img.onload = res; img.src = small.toDataURL("image/jpeg", 0.35); });
-    await loadSource(img, "harbour-sample.jpg", "Sample photo");
+    const p = await addPhoto(img, "harbour-sample.jpg", { label: "Sample photo", sample: true });
+    activate(p);
   }
-  $("#sampleBtn").addEventListener("click", loadSample);
+  $("#sampleBtn").addEventListener("click", () => {
+    const s = photos.find(p => p.sample);
+    s ? activate(s) : loadSample();
+  });
 
   syncControls(); applySplit();
   loadSample();
