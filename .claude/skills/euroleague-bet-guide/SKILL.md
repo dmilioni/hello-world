@@ -27,7 +27,9 @@ Every pick must be a Bet Builder (BB) market from the same game.
 
 1. Open `https://www.stoiximan.gr/` and go to Μπάσκετ → EuroLeague → the game, with Bet Builder switched on. Also open the offers page (Προσφορές). Use one quick `curl` check.
    - **Tested 7/10/2026: the domain is allowed, but Stoiximan geo-blocks cloud sessions.** It returns 403 with the message "According to the local regulatory provisions, our services cannot be accessed from your location", because the sessions run outside Greece.
-   - When you get that 403, don't retry and don't look for workarounds. Go straight to the screenshots step below.
+   - When you get that 403, don't retry and don't look for workarounds. Go straight to the next option.
+   - **Best option: the user's own Chrome browser in Greece.** If Claude in Chrome tools (`mcp__claude-in-chrome__*`) are available, which happens when the skill runs on the user's computer through the Claude Desktop app or a local `claude` session with the Chrome extension, load the `chrome-browser` skill first. Then open the game on stoiximan.gr in a new tab with Bet Builder on, and read the markets and the offers page. **Read only:** never log in, click a bet, add to the slip, deposit, or change account settings. The user places the bets.
+   - If no browser tools are available (for example in the cloud session or the daily scheduled run), use the screenshots step below.
 2. **If you cannot read the odds, stop and ask the user for screenshots.** Do not guess the odds. Ask for these sections:
    - **Κύριες Αγορές:** winner, handicap and total.
    - **Player ladders and O/U lines:** Πόντοι, Ριμπάουντ, Ασίστ, Εύστοχα Τρίποντα, Εύστοχα Δίποντα, Π+Ρ+Α, Π+Α, Ρ+Α, Double-Double, Επιθετικά/Αμυντικά Ριμπάουντ.
