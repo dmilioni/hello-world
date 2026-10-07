@@ -34,7 +34,11 @@ Every pick must be a Bet Builder (BB) market from the same game.
 
 ## Step 3 — Research (do this before choosing any pick)
 
-Search in English and Greek. Useful sources: euroleaguebasketball.net (game centers, game facts, injury reports), eurohoops.net (EN and EL), basketnews.com, sofascore.com news, esake.gr (Greek league), gazzetta.gr, sport24.gr, sportal.gr, sdna.gr, in.gr, and opponent-language press. Many of these sites are blocked from fetching, so use the search-result summaries, cross-check numbers across two sources, and flag any conflicts.
+Search in English and Greek.
+
+**Always check Gazzetta's EuroLeague section first** for news, 12-man lists, injuries, the coach's press conference and live reports: `https://www.gazzetta.gr/basketball/euroleague`. Use `https://www.gazzetta.gr/basketball/stoiximan-gbl` for Greek league games. Fetch the pages directly; if fetching is blocked, run WebSearch with `allowed_domains: ["gazzetta.gr"]` and queries such as `Ολυμπιακός 12άδα Εφές` or `Παναθηναϊκός τραυματίες`.
+
+Other useful sources: euroleaguebasketball.net (game centers, game facts, injury reports), eurohoops.net (EN and EL), basketnews.com, sofascore.com news, esake.gr (Greek league), sport24.gr, sportal.gr, sdna.gr, in.gr, and opponent-language press. Many of these sites are blocked from fetching, so use the search-result summaries, cross-check numbers across two sources, and flag any conflicts.
 
 Collect:
 
