@@ -47,7 +47,15 @@ Search in English and Greek.
 
 Fetch the pages directly; if fetching is blocked, run WebSearch with `allowed_domains: ["euroleaguebasketball.net"]`, for example `Olympiacos Anadolu Efes game center 2026-27` or `injury report round 4`. When stats from other sites conflict with the official box score, trust the official one.
 
-Other useful sources: eurohoops.net (EN and EL), basketnews.com, sofascore.com news, esake.gr (Greek league), sport24.gr, sportal.gr, sdna.gr, in.gr, and opponent-language press. Many of these sites are blocked from fetching, so use the search-result summaries, cross-check numbers across two sources, and flag any conflicts.
+**Always check BasketNews** at `https://basketnews.com`. Use it for:
+- the daily-updated EuroLeague injury report (search "EuroLeague Injury Report (updated daily)");
+- team pages with roster, schedule and stats (for example `/teams/460-olympiacos-piraeus.html`, `/teams/583-anadolu-efes-istanbul.html`);
+- player pages with game logs across EuroLeague and national leagues;
+- transfer and signing news, and post-game coach quotes.
+
+Fetch the pages directly; if fetching is blocked, run WebSearch with `allowed_domains: ["basketnews.com"]`, for example `Olympiacos injury` or `Vezenkov stats`.
+
+Other useful sources: eurohoops.net (EN and EL), sofascore.com news, esake.gr (Greek league), sport24.gr, sportal.gr, sdna.gr, in.gr, and opponent-language press. Many of these sites are blocked from fetching, so use the search-result summaries, cross-check numbers across two sources, and flag any conflicts.
 
 Collect:
 
