@@ -114,6 +114,8 @@ button, input, select { font: inherit; color: inherit; }
 .seg button[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
 .seg button:disabled { opacity: .4; cursor: not-allowed; }
 .seg.full { display: flex; } .seg.full button { flex: 1; padding-inline: 6px; }
+.seg.presets { display: grid; grid-template-columns: repeat(3, 1fr); }
+.seg.presets button { border-left: 1px solid var(--line); border-top: 1px solid var(--line); margin: 0 0 -1px -1px; }
 
 .panel { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
 .card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px; display: flex; flex-direction: column; gap: 12px; }
@@ -216,11 +218,12 @@ button, input, select { font: inherit; color: inherit; }
 
     <div class="card">
       <h2>Fix</h2>
-      <div class="seg full" role="group" aria-label="Preset" id="presets">
+      <div class="seg full presets" role="group" aria-label="Preset" id="presets">
         <button type="button" data-preset="auto" aria-pressed="true">Auto</button>
         <button type="button" data-preset="scan">Old print</button>
         <button type="button" data-preset="night">Low light</button>
         <button type="button" data-preset="soft">Blurry</button>
+        <button type="button" data-preset="shake">Shaky</button>
         <button type="button" data-preset="off">None</button>
       </div>
       <p class="note" id="presetNote">Auto settings come from the diagnosis above.</p>
@@ -230,8 +233,10 @@ button, input, select { font: inherit; color: inherit; }
         <div class="seg full" role="group" aria-label="Upscale" id="upscale">
           <button type="button" data-up="1">1×</button>
           <button type="button" data-up="2">2×</button>
+          <button type="button" data-up="3">3×</button>
           <button type="button" data-up="4">4×</button>
         </div>
+        <div id="sizeControls"></div>
         <p class="note mono" id="outInfo"></p>
       </div>
     </div>
@@ -347,6 +352,245 @@ function resize(src, w, h, W, H) {
   return out;
 }
 
+// Lanczos-3 resampling (sharper than Catmull-Rom) for the first upscale pass.
+function lanczos(x) {
+  if (x === 0) return 1;
+  if (x <= -3 || x >= 3) return 0;
+  const px = Math.PI * x;
+  return 3 * Math.sin(px) * Math.sin(px / 3) / (px * px);
+}
+function resizeLanczos(src, w, h, W, H) {
+  const pass = (n, m) => {
+    const idx = new Int32Array(m * 6), wt = new Float32Array(m * 6), sc = n / m;
+    for (let o = 0; o < m; o++) {
+      const s = (o + 0.5) * sc - 0.5, i0 = Math.floor(s) - 2;
+      let sum = 0;
+      for (let j = 0; j < 6; j++) { const v = lanczos(s - (i0 + j)); wt[o * 6 + j] = v; sum += v; idx[o * 6 + j] = Math.min(n - 1, Math.max(0, i0 + j)); }
+      for (let j = 0; j < 6; j++) wt[o * 6 + j] /= sum;
+    }
+    return [idx, wt];
+  };
+  const [xi, xw] = pass(w, W), [yi, yw] = pass(h, H);
+  const tmp = new Float32Array(W * h);
+  for (let y = 0; y < h; y++) {
+    const row = y * w, o = y * W;
+    for (let x = 0; x < W; x++) {
+      const k = x * 6; let s = 0;
+      for (let j = 0; j < 6; j++) s += src[row + xi[k + j]] * xw[k + j];
+      tmp[o + x] = s;
+    }
+  }
+  const out = new Float32Array(W * H);
+  for (let y = 0; y < H; y++) {
+    const k = y * 6, o = y * W;
+    for (let j = 0; j < 6; j++) {
+      const r = yi[k + j] * W, wj = yw[k + j];
+      for (let x = 0; x < W; x++) out[o + x] += tmp[r + x] * wj;
+    }
+  }
+  return out;
+}
+
+// Upscale by an integer factor, then iterative back-projection: shrink the estimate back down,
+// compare with the original, and push the difference back up. Each round restores edge detail
+// that plain interpolation smears, while staying faithful to the pixels the photo actually has.
+function superResolve(Y, w, h, up, rounds) {
+  const W = w * up, H = h * up, inv = 1 / (up * up);
+  const est = resizeLanczos(Y, w, h, W, H);
+  const down = new Float32Array(w * h);
+  for (let it = 0; it < rounds; it++) {
+    down.fill(0);
+    for (let y = 0; y < H; y++) {
+      const dy = ((y / up) | 0) * w, o = y * W;
+      for (let x = 0; x < W; x++) down[dy + ((x / up) | 0)] += est[o + x];
+    }
+    for (let i = 0; i < w * h; i++) down[i] = Y[i] - down[i] * inv;
+    const corr = resize(down, w, h, W, H);
+    for (let i = 0; i < W * H; i++) est[i] += corr[i];
+  }
+  return est;
+}
+
+// Point-spread functions for deblurring.
+function gaussKernel(sigma) {
+  const r = Math.max(1, Math.ceil(sigma * 2.5)), k = new Float32Array(2 * r + 1);
+  let s = 0;
+  for (let i = -r; i <= r; i++) { const v = Math.exp(-(i * i) / (2 * sigma * sigma)); k[i + r] = v; s += v; }
+  for (let i = 0; i < k.length; i++) k[i] /= s;
+  return k;
+}
+function convSep(src, dst, w, h, k, tmp) {
+  const r = (k.length - 1) >> 1;
+  for (let y = 0; y < h; y++) {
+    const o = y * w;
+    for (let x = 0; x < w; x++) {
+      let s = 0;
+      for (let j = -r; j <= r; j++) { const xx = x + j; s += src[o + (xx < 0 ? 0 : xx >= w ? w - 1 : xx)] * k[j + r]; }
+      tmp[o + x] = s;
+    }
+  }
+  dst.fill(0);
+  for (let j = -r; j <= r; j++) {
+    const kj = k[j + r];
+    for (let y = 0; y < h; y++) {
+      const yy = y + j, ro = (yy < 0 ? 0 : yy >= h ? h - 1 : yy) * w, o = y * w;
+      for (let x = 0; x < w; x++) dst[o + x] += tmp[ro + x] * kj;
+    }
+  }
+}
+// Straight-line blur (camera shake). The kernel is symmetric, so it is also its own adjoint.
+function motionTaps(len, angleDeg) {
+  const n = Math.max(2, Math.ceil(len)), a = angleDeg * Math.PI / 180, ca = Math.cos(a), sa = -Math.sin(a), taps = [];
+  for (let i = 0; i < n; i++) {
+    const t = (i / (n - 1) - 0.5) * (len - 1), dx = t * ca, dy = t * sa;
+    const x0 = Math.floor(dx), y0 = Math.floor(dy), fx = dx - x0, fy = dy - y0;
+    taps.push([x0, y0, (1 - fx) * (1 - fy) / n], [x0 + 1, y0, fx * (1 - fy) / n], [x0, y0 + 1, (1 - fx) * fy / n], [x0 + 1, y0 + 1, fx * fy / n]);
+  }
+  // Neighbouring samples share pixels: merge them so each pixel offset is read once.
+  const merged = new Map();
+  for (const [ox, oy, wt] of taps) { const key = ox + "," + oy; merged.set(key, (merged.get(key) || 0) + wt); }
+  return [...merged].map(([key, wt]) => [...key.split(",").map(Number), wt]).filter(t => t[2] > 1e-6);
+}
+function convTaps(src, dst, w, h, taps) {
+  dst.fill(0);
+  for (const [ox, oy, wt] of taps) {
+    for (let y = 0; y < h; y++) {
+      const yy = y + oy, ro = (yy < 0 ? 0 : yy >= h ? h - 1 : yy) * w, o = y * w;
+      const xs = Math.max(0, -ox), xe = Math.min(w, w - ox);
+      for (let x = 0; x < xs; x++) dst[o + x] += src[ro] * wt;
+      for (let x = xs; x < xe; x++) dst[o + x] += src[ro + x + ox] * wt;
+      for (let x = Math.max(xe, xs); x < w; x++) dst[o + x] += src[ro + w - 1] * wt;
+    }
+  }
+}
+
+// Deblur: Richardson-Lucy deconvolution of brightness with Biggs-Andrews acceleration.
+// Grain gets amplified as iterations pile up, so the count shrinks as the photo's leftover noise grows,
+// and flat areas take less of the result.
+function deblur(Y, w, h, P, rs) {
+  const s = P.deblur / 100;
+  const motion = P.blurType === "motion";
+  const size = (motion ? P.motionLen : P.blurSize) * rs;
+  if (s <= 0 || size < (motion ? 1.5 : 0.35)) return;
+  const N = w * h, off = 0.03, tmp = new Float32Array(N);
+  const k = motion ? null : gaussKernel(size), mt = motion ? motionTaps(size, P.blurAngle) : null;
+  const blur = (a, b) => motion ? convTaps(a, b, w, h, mt) : convSep(a, b, w, h, k, tmp);
+  const residual = (P.noise || 0) * (1 - 0.7 * (P.denoise || 0) / 100);
+  const maxIters = Math.max(6, Math.min(45, Math.round(50 / (1 + 0.8 * residual))));
+  const iters = Math.round(maxIters * (0.25 + 0.75 * s));
+  const obs = new Float32Array(N);
+  for (let i = 0; i < N; i++) obs[i] = Math.max(0, Y[i]) + off;
+  let x = obs.slice(), xPrev = obs.slice(), xNext = new Float32Array(N);
+  const yv = new Float32Array(N), est = new Float32Array(N), g1 = new Float32Array(N), g2 = new Float32Array(N);
+  let haveG1 = false, haveG2 = false;
+  const report = typeof reportProgress === "function" ? reportProgress : null;
+  for (let it = 0; it < iters; it++) {
+    if (report && it % 4 === 0) report(it / iters);
+    let a = 0;
+    if (haveG2) {
+      let num = 0, den = 0;
+      for (let i = 0; i < N; i++) { num += g1[i] * g2[i]; den += g2[i] * g2[i]; }
+      a = den > 0 ? Math.max(0, Math.min(0.95, num / den)) : 0;
+    }
+    for (let i = 0; i < N; i++) { const v = x[i] + a * (x[i] - xPrev[i]); yv[i] = v > 1e-4 ? v : 1e-4; }
+    blur(yv, est);
+    for (let i = 0; i < N; i++) { const r = obs[i] / est[i]; est[i] = r < 0.5 ? 0.5 : r > 2 ? 2 : r; }
+    blur(est, xNext);
+    if (haveG1) { g2.set(g1); haveG2 = true; }
+    for (let i = 0; i < N; i++) { const v = yv[i] * xNext[i]; g1[i] = v - yv[i]; xNext[i] = v; }
+    haveG1 = true;
+    const t = xPrev; xPrev = x; x = xNext; xNext = t;
+  }
+  // Edge mask: local contrast of the blurred photo, so smooth sky and skin stay calm.
+  const g = new Float32Array(N), m = new Float32Array(N);
+  for (let y = 0; y < h; y++) for (let xx = 0; xx < w; xx++) {
+    const i = y * w + xx, xr = xx < w - 1 ? 1 : 0, yd = y < h - 1 ? w : 0;
+    g[i] = Math.abs(obs[i + xr] - obs[i]) + Math.abs(obs[i + yd] - obs[i]);
+  }
+  box(g, m, w, h, 2, tmp);
+  for (let i = 0; i < N; i++) Y[i] += (x[i] - off - Y[i]) * Math.min(1, 0.1 + m[i] / 0.06);
+}
+
+// Blur estimate. At a strong edge, a step of contrast C blurred by a Gaussian has peak gradient C/(σ√2π),
+// and one smeared by camera shake of length L has peak gradient C/L along the shake. The shake
+// direction is where the edge structure tensor has the least gradient energy.
+function estimateBlur(Y, w, h) {
+  const N = w * h, gx = new Float32Array(N), gy = new Float32Array(N), mag = new Float32Array(N), gh = new Uint32Array(1024);
+  for (let y = 1; y < h - 1; y++) for (let x = 1; x < w - 1; x++) {
+    const i = y * w + x, a = (Y[i + 1] - Y[i - 1]) / 2, b = (Y[i + w] - Y[i - w]) / 2;
+    gx[i] = a; gy[i] = b; const m = Math.hypot(a, b); mag[i] = m; gh[Math.min(1023, (m * 2046) | 0)]++;
+  }
+  const thr = Math.max(0.02, pct(gh, Math.max(1, (w - 2) * (h - 2)), 0.95) / 2), R = 12;
+  let jxx = 0, jyy = 0, jxy = 0;
+  for (let i = 0; i < N; i++) if (mag[i] >= thr) { jxx += gx[i] * gx[i]; jyy += gy[i] * gy[i]; jxy += gx[i] * gy[i]; }
+  const tr = jxx + jyy, aniso = tr > 0 ? Math.sqrt((jxx - jyy) ** 2 + 4 * jxy * jxy) / tr : 0;
+  const theta = 0.5 * Math.atan2(2 * jxy, jxx - jyy) + Math.PI / 2; // weakest gradient direction = shake direction (image y points down)
+  const sx = Math.cos(theta), sy = Math.sin(theta);
+  const sig = [], len = [];
+  // Pass 1: blur width across ordinary edges. Pass 2: smear length across edges that face the shake,
+  // which are weaker (the shake flattened them), so they get a lower threshold and a longer walk.
+  for (const [T, R, onlyShake] of [[thr, 12, false], [thr / 4, 24, true]]) {
+    for (let y = R; y < h - R; y++) for (let x = R; x < w - R; x++) {
+      const i = y * w + x, m = mag[i];
+      if (m < T) continue;
+      const dx = gx[i] / m, dy = gy[i] / m, facing = Math.abs(dx * sx + dy * sy) > 0.85;
+      if (onlyShake && !facing) continue;
+      if (m < mag[Math.round(y + dy) * w + Math.round(x + dx)] || m < mag[Math.round(y - dy) * w + Math.round(x - dx)]) continue;
+      let hi = Y[i], lo = Y[i];
+      for (let t = 1; t <= R; t++) {
+        const a = Y[Math.round(y + dy * t) * w + Math.round(x + dx * t)], b = Y[Math.round(y - dy * t) * w + Math.round(x - dx * t)];
+        if (a > hi) hi = a; if (b > hi) hi = b; if (a < lo) lo = a; if (b < lo) lo = b;
+      }
+      if (hi - lo < 0.08) continue;
+      if (onlyShake) len.push((hi - lo) / m); else sig.push((hi - lo) / (m * 2.5066));
+    }
+  }
+  const med = a => { a.sort((p, q) => p - q); return a.length > 20 ? a[(a.length * 0.5) | 0] : 0; };
+  const raw = med(sig);
+  return {
+    blurSigma: Math.sqrt(Math.max(0, raw * raw - 0.68)), edges: sig.length, aniso,
+    shakeLen: (l => l + Math.max(0, l - 8) * 0.25)(med(len)), blurAngle: ((-theta * 180 / Math.PI) % 180 + 180) % 180
+  };
+}
+
+// Shake length: the derivative of a straight-line smear is a pair of spikes L apart, so the
+// autocorrelation of the derivative along the shake direction dips at lag L. The same curve taken
+// across the shake (which the shake leaves alone) is subtracted, so repeating shapes in the scene
+// do not register as a dip.
+function shakeLength(Y, w, h, angleDeg) {
+  const a = angleDeg * Math.PI / 180, MAX = 60;
+  const sample = (x, y) => {
+    const x0 = Math.floor(x), y0 = Math.floor(y), fx = x - x0, fy = y - y0, i = y0 * w + x0;
+    return (Y[i] * (1 - fx) + Y[i + 1] * fx) * (1 - fy) + (Y[i + w] * (1 - fx) + Y[i + w + 1] * fx) * fy;
+  };
+  const step = Math.max(1, Math.round(Math.sqrt(w * h / 120000)));
+  const pts = [];
+  for (let y = MAX + 2; y < h - MAX - 3; y += step) for (let x = MAX + 2; x < w - MAX - 3; x += step) pts.push(x, y);
+  if (pts.length < 200) return 0;
+  const curve = (cx, cy) => {
+    const d = (x, y) => sample(x + cx * 0.5, y + cy * 0.5) - sample(x - cx * 0.5, y - cy * 0.5);
+    const base = new Float32Array(pts.length / 2), c = new Float32Array(MAX + 2);
+    let e0 = 0;
+    for (let k = 0; k < base.length; k++) { const v = d(pts[2 * k], pts[2 * k + 1]); base[k] = v; e0 += v * v; }
+    if (e0 <= 0) return c;
+    for (let lag = 2; lag <= MAX + 1; lag++) {
+      let sum = 0;
+      for (let k = 0; k < base.length; k++) sum += base[k] * d(pts[2 * k] + cx * lag, pts[2 * k + 1] + cy * lag);
+      c[lag] = sum / e0;
+    }
+    return c;
+  };
+  const along = curve(Math.cos(a), -Math.sin(a)), across = curve(Math.sin(a), Math.cos(a));
+  const c = along.map((v, i) => v - across[i]);
+  // The smear's own dip is the first deep one; scene structure adds weaker dips further out.
+  const mins = [];
+  for (let lag = 3; lag <= MAX; lag++) if (c[lag] < c[lag - 1] && c[lag] <= c[lag + 1]) mins.push([lag, c[lag]]);
+  const deepest = Math.min(0, ...mins.map(m => m[1]));
+  if (deepest > -0.05) return 0;
+  const first = mins.find(m => m[1] <= deepest * 0.6);
+  return first ? first[0] : 0;
+}
+
 function pct(hist, total, q) {
   const target = total * q; let acc = 0;
   for (let i = 0; i < hist.length; i++) { acc += hist[i]; if (acc >= target) return i / (hist.length - 1); }
@@ -405,8 +649,10 @@ function analyze(d, w, h) {
     if (grad[i] >= gEdge) { hf += Math.abs(Y[i] - b1[i]); mf += Math.abs(b1[i] - b4[i]); }
   }
   const sharpRatio = mf > 0 ? hf / mf : 0;
+  const blurInfo = estimateBlur(Y, w, h);
+  if (blurInfo.aniso > 0.3) blurInfo.shakeLen = shakeLength(Y, w, h, blurInfo.blurAngle) || blurInfo.shakeLen;
   return {
-    sigma, sharpRatio,
+    sigma, sharpRatio, ...blurInfo,
     cb: nMid ? sCb / nMid : 0, cr: nMid ? sCr / nMid : 0, chroma: sSat / N,
     median: pct(hist, N, 0.5), p1: pct(hist, N, 0.01), p99: pct(hist, N, 0.99)
   };
@@ -435,6 +681,9 @@ function processImage(m) {
     guided(Y, U, w, h, rc, ec, q); for (let i = 0; i < N; i++) U[i] += (q[i] - U[i]) * kc;
     guided(Y, V, w, h, rc, ec, q); for (let i = 0; i < N; i++) V[i] += (q[i] - V[i]) * kc;
   }
+
+  // 1b. Deblur at the photo's own resolution, where the blur happened, before tone changes bend the values.
+  deblur(Y, w, h, P, rs);
 
   // 2. Levels, white balance, auto gamma, warmth and exposure, folded into one lookup table per channel.
   const R = new Float32Array(N), G = new Float32Array(N), B = new Float32Array(N);
@@ -512,11 +761,12 @@ function processImage(m) {
     }
   }
 
-  // 5. Upscale.
+  // 5. Upscale: detail-recovering on brightness, smooth interpolation on color.
   let W = w, Ht = h;
   if (up > 1) {
-    W = Math.round(w * up); Ht = Math.round(h * up);
-    Y = resize(Y, w, h, W, Ht); U = resize(U, w, h, W, Ht); V = resize(V, w, h, W, Ht);
+    W = w * up; Ht = h * up;
+    Y = superResolve(Y, w, h, up, Math.round(P.detail / 100 * 4));
+    U = resize(U, w, h, W, Ht); V = resize(V, w, h, W, Ht);
   }
   const N2 = W * Ht;
 
@@ -550,12 +800,18 @@ function processImage(m) {
 <script>
 (() => {
   const $ = s => document.querySelector(s);
-  const EXPORT_MAX = 12e6, PREVIEW_MAX = 4e6, SOURCE_MAX_SIDE = 4096;
+  const EXPORT_MAX = 12e6, PREVIEW_MAX = 4e6, SOURCE_MAX_SIDE = 4096, DEBLUR_PREVIEW_SRC = 0.7e6;
 
   const CONTROLS = [
-    { group: "Clean up", items: [
-      { id: "denoise", label: "Denoise", min: 0, max: 100, step: 1 },
+    { group: "Blur", items: [
+      { id: "blurType", kind: "seg", label: "Kind of blur", options: [["focus", "Out of focus"], ["motion", "Camera shake"]] },
+      { id: "deblur", label: "Deblur", min: 0, max: 100, step: 1 },
+      { id: "blurSize", label: "Blur size", min: 0.5, max: 4, step: 0.1, fmt: v => v.toFixed(1) + " px", show: p => p.blurType !== "motion" },
+      { id: "motionLen", label: "Shake length", min: 3, max: 40, step: 1, fmt: v => v + " px", show: p => p.blurType === "motion" },
+      { id: "blurAngle", label: "Shake direction", min: 0, max: 179, step: 1, fmt: v => v + "°", show: p => p.blurType === "motion" },
       { id: "sharpen", label: "Sharpen", min: 0, max: 100, step: 1 } ] },
+    { group: "Clean up", items: [
+      { id: "denoise", label: "Denoise", min: 0, max: 100, step: 1 } ] },
     { group: "Light", items: [
       { id: "tone", label: "Auto levels", min: 0, max: 100, step: 1, fmt: v => v + "%" },
       { id: "exposure", label: "Exposure", min: -2, max: 2, step: 0.1, fmt: v => (v > 0 ? "+" : v < 0 ? "−" : "±") + Math.abs(v).toFixed(1) + " EV" },
@@ -564,20 +820,36 @@ function processImage(m) {
     { group: "Color", items: [
       { id: "wb", label: "Remove color cast", min: 0, max: 100, step: 1, fmt: v => v + "%" },
       { id: "warmth", label: "Warmth", min: -100, max: 100, step: 1, fmt: v => (v > 0 ? "+" : v < 0 ? "−" : "±") + Math.abs(v * 20) + " K" },
-      { id: "color", label: "Vibrance", min: -100, max: 100, step: 1, fmt: v => (v > 0 ? "+" : v < 0 ? "−" : "") + Math.abs(v) } ] }
+      { id: "color", label: "Vibrance", min: -100, max: 100, step: 1, fmt: v => (v > 0 ? "+" : v < 0 ? "−" : "") + Math.abs(v) } ] },
+    { group: "", mount: "#sizeControls", items: [
+      { id: "detail", label: "Recover detail", min: 0, max: 100, step: 1, fmt: v => v + "%" } ] }
   ];
-  const NEUTRAL = { denoise: 0, sharpen: 0, tone: 0, exposure: 0, shadows: 0, clarity: 0, wb: 0, warmth: 0, color: 0 };
+  const BLUR0 = { deblur: 0, blurType: "focus", blurSize: 1.5, motionLen: 9, blurAngle: 0 };
+  const NEUTRAL = { denoise: 0, sharpen: 0, tone: 0, exposure: 0, shadows: 0, clarity: 0, wb: 0, warmth: 0, color: 0, ...BLUR0, detail: 0 };
   const PRESETS = {
-    scan:  { denoise: 45, sharpen: 40, tone: 100, exposure: 0, shadows: 15, clarity: 30, wb: 90, warmth: 0, color: 25 },
-    night: { denoise: 75, sharpen: 30, tone: 100, exposure: 0.5, shadows: 55, clarity: 15, wb: 55, warmth: 0, color: 10 },
-    soft:  { denoise: 15, sharpen: 85, tone: 60, exposure: 0, shadows: 10, clarity: 40, wb: 40, warmth: 0, color: 10 },
+    scan:  { denoise: 45, sharpen: 30, tone: 100, exposure: 0, shadows: 15, clarity: 30, wb: 90, warmth: 0, color: 25, ...BLUR0, deblur: 35, blurSize: 1.2, detail: 60 },
+    night: { denoise: 75, sharpen: 30, tone: 100, exposure: 0.5, shadows: 55, clarity: 15, wb: 55, warmth: 0, color: 10, ...BLUR0, detail: 40 },
+    soft:  { denoise: 20, sharpen: 30, tone: 60, exposure: 0, shadows: 10, clarity: 30, wb: 40, warmth: 0, color: 10, ...BLUR0, deblur: 75, blurSize: 2, detail: 80 },
+    shake: { denoise: 20, sharpen: 25, tone: 60, exposure: 0, shadows: 10, clarity: 25, wb: 40, warmth: 0, color: 10, ...BLUR0, deblur: 75, blurType: "motion", detail: 80 },
     off: NEUTRAL
   };
+  // Presets borrow the blur measurements from the photo's diagnosis.
+  function presetParams(name) {
+    if (name === "auto") return { ...(state.auto || NEUTRAL) };
+    const p = { ...PRESETS[name] }, a = state.auto;
+    if (a && name !== "off") {
+      p.motionLen = a.motionLen; p.blurAngle = a.blurAngle;
+      if (name === "soft") p.blurSize = Math.max(1.2, a.blurSize);
+      if (name === "scan" && a.deblur) p.blurSize = a.blurSize;
+    }
+    return p;
+  }
   const PRESET_NOTES = {
     auto: "Auto settings come from the diagnosis above.",
     scan: "For faded or yellowed prints and scans.",
     night: "For dark, grainy indoor or night shots.",
-    soft: "For out-of-focus or heavily compressed images.",
+    soft: "For out-of-focus photos. Adjust Blur size until edges look crisp.",
+    shake: "For photos smeared by a moving camera. Shake length and direction are measured from the photo.",
     off: "No changes, apart from any upscaling.",
     custom: "Custom settings."
   };
@@ -594,16 +866,19 @@ function processImage(m) {
   const pending = new Map();
   try {
     const url = URL.createObjectURL(new Blob([engineSrc + `
+      let progressId = 0;
+      function reportProgress(f) { postMessage({ id: progressId, progress: f }); }
       self.onmessage = e => {
         const m = e.data;
         try {
           if (m.type === "analyze") postMessage({ id: m.id, result: analyze(m.data, m.w, m.h) });
-          else { const r = processImage(m); postMessage({ id: m.id, result: r }, [r.out.buffer]); }
+          else { progressId = m.id; const r = processImage(m); postMessage({ id: m.id, result: r }, [r.out.buffer]); }
         } catch (err) { postMessage({ id: m.id, error: String(err && err.message || err) }); }
       };`], { type: "text/javascript" }));
     worker = new Worker(url);
     worker.onmessage = e => {
       const p = pending.get(e.data.id); if (!p) return;
+      if (e.data.progress !== undefined) { if (p.onProgress) p.onProgress(e.data.progress); return; }
       pending.delete(e.data.id);
       e.data.error ? p.reject(new Error(e.data.error)) : p.resolve(e.data.result);
     };
@@ -625,11 +900,11 @@ function processImage(m) {
       } catch (err) { rej(err); }
     }, 16));
   }
-  function call(msg) {
+  function call(msg, onProgress) {
     if (!worker) return runLocal(msg);
     const id = ++seq; msg.id = id;
     return new Promise((resolve, reject) => {
-      pending.set(id, { resolve, reject, msg });
+      pending.set(id, { resolve, reject, msg, onProgress });
       worker.postMessage(msg, [msg.data.buffer]);
     });
   }
@@ -641,20 +916,31 @@ function processImage(m) {
   const controlsEl = $("#controls");
   for (const g of CONTROLS) {
     const grp = document.createElement("div"); grp.className = "group";
-    grp.innerHTML = `<h3>${g.group}</h3>`;
+    grp.innerHTML = g.group ? `<h3>${g.group}</h3>` : "";
+    if (g.mount) grp.className = "";
     for (const c of g.items) {
-      const wrap = document.createElement("div"); wrap.className = "ctl";
-      wrap.innerHTML = `<label for="ctl-${c.id}"><span>${c.label}</span><output id="out-${c.id}" for="ctl-${c.id}"></output></label>
-        <input type="range" id="ctl-${c.id}" min="${c.min}" max="${c.max}" step="${c.step}">`;
+      const wrap = document.createElement("div"); wrap.className = "ctl"; wrap.id = "wrap-" + c.id;
+      if (c.kind === "seg") {
+        wrap.innerHTML = `<div class="seg full" role="group" aria-label="${c.label}" id="ctl-${c.id}">` +
+          c.options.map(([v, l]) => `<button type="button" data-val="${v}">${l}</button>`).join("") + `</div>`;
+        wrap.addEventListener("click", e => {
+          const b = e.target.closest("[data-val]"); if (!b) return;
+          state.params[c.id] = b.dataset.val;
+          syncControls(); setPreset("custom", false); requestRender(0);
+        });
+      } else {
+        wrap.innerHTML = `<label for="ctl-${c.id}"><span>${c.label}</span><output id="out-${c.id}" for="ctl-${c.id}"></output></label>
+          <input type="range" id="ctl-${c.id}" min="${c.min}" max="${c.max}" step="${c.step}">`;
+        wrap.querySelector("input").addEventListener("input", e => {
+          state.params[c.id] = parseFloat(e.target.value);
+          showValue(c);
+          setPreset("custom", false);
+          requestRender();
+        });
+      }
       grp.appendChild(wrap);
-      wrap.querySelector("input").addEventListener("input", e => {
-        state.params[c.id] = parseFloat(e.target.value);
-        showValue(c);
-        setPreset("custom", false);
-        requestRender();
-      });
     }
-    controlsEl.appendChild(grp);
+    (g.mount ? $(g.mount) : controlsEl).appendChild(grp);
   }
   const ALL = CONTROLS.flatMap(g => g.items);
   function showValue(c) {
@@ -662,7 +948,11 @@ function processImage(m) {
     $("#out-" + c.id).textContent = c.fmt ? c.fmt(v) : String(v);
   }
   function syncControls() {
-    for (const c of ALL) { $("#ctl-" + c.id).value = state.params[c.id]; showValue(c); }
+    for (const c of ALL) {
+      if (c.kind === "seg") setPressed($("#ctl-" + c.id), "val", state.params[c.id]);
+      else { $("#ctl-" + c.id).value = state.params[c.id]; showValue(c); }
+      if (c.show) $("#wrap-" + c.id).hidden = !c.show(state.params);
+    }
   }
   function setPressed(container, attr, value) {
     container.querySelectorAll(`[data-${attr}]`).forEach(b => b.setAttribute("aria-pressed", String(b.dataset[attr] === String(value))));
@@ -672,7 +962,7 @@ function processImage(m) {
     setPressed($("#presets"), "preset", name);
     $("#presetNote").textContent = PRESET_NOTES[name];
     if (!apply) return;
-    state.params = { ...(name === "auto" ? (state.auto || NEUTRAL) : PRESETS[name]) };
+    state.params = presetParams(name);
     syncControls();
     requestRender(0);
   }
@@ -703,7 +993,7 @@ function processImage(m) {
       b.disabled = !!s && s.w * s.h * u * u > EXPORT_MAX;
       b.title = b.disabled ? "Output would exceed 12 megapixels" : "";
     });
-    if (s && s.w * s.h * state.up * state.up > EXPORT_MAX) state.up = s.w * s.h * 4 <= EXPORT_MAX ? 2 : 1;
+    if (s) while (state.up > 1 && s.w * s.h * state.up * state.up > EXPORT_MAX) state.up--;
     setPressed($("#upscale"), "up", state.up);
     if (s) {
       const W = Math.round(s.w * state.up), H = Math.round(s.h * state.up);
@@ -797,24 +1087,31 @@ function processImage(m) {
     const cast = Math.hypot(a.cb, a.cr), range = a.p99 - a.p1;
     return [
       ["Noise", a.sigma < 2.5 ? "Low" : a.sigma < 6 ? "Moderate" : "Heavy", a.sigma >= 2.5, `σ ${a.sigma.toFixed(1)}`],
-      a.sigma >= 6 ? ["Detail", "Hidden by noise", true, "–"] : ["Detail", a.sharpRatio < 0.45 ? "Soft" : a.sharpRatio < 0.65 ? "Slightly soft" : "Crisp", a.sharpRatio < 0.65, `${a.sharpRatio.toFixed(2)}`],
+      isShake(a) ? ["Blur", "Camera shake", true, `${Math.round(a.shakeLen)} px · ${Math.round(a.blurAngle)}°`]
+        : ["Blur", a.blurSigma >= 2.2 ? "Strong" : a.blurSigma >= 1.1 ? "Out of focus" : "Sharp", a.blurSigma >= 1.1, `≈ ${a.blurSigma.toFixed(1)} px`],
       ["Color cast", cast < 0.02 ? "Neutral" : `${castName(a.cb, a.cr)[0].toUpperCase()}${castName(a.cb, a.cr).slice(1)}`, cast >= 0.02, `Δ ${(cast * 100).toFixed(1)}`],
       ["Exposure", a.median < 0.3 ? "Dark" : a.median > 0.7 ? "Bright" : "Balanced", a.median < 0.3 || a.median > 0.7, `${Math.round(a.median * 100)}%`],
       ["Contrast", range < 0.6 ? "Flat" : range < 0.82 ? "Low" : "Full", range < 0.82, `${Math.round(range * 100)}%`],
       ["Size", `${state.src.w} × ${state.src.h}`, Math.max(state.src.w, state.src.h) < 1400, `${(state.src.w * state.src.h / 1e6).toFixed(1)} MP`]
     ];
   }
+  function isShake(a) { return a.aniso > 0.45 && a.shakeLen >= 4; }
   function autoParams(a, w, h) {
     const c = (v, lo, hi) => Math.round(Math.min(hi, Math.max(lo, v)));
     const cast = Math.hypot(a.cb, a.cr), range = a.p99 - a.p1;
     const denoise = c((a.sigma - 1.2) * 11, 0, 85);
     let sharpen = a.sharpRatio < 0.45 ? 70 : a.sharpRatio < 0.65 ? 50 : 30;
     if (denoise > 40) sharpen = Math.min(sharpen, 30);
+    const shake = isShake(a);
+    let deblur = shake ? 70 : a.blurSigma >= 1.1 ? c(30 + (a.blurSigma - 1) * 35, 30, 80) : 0;
+    if (a.sigma >= 6) deblur = Math.min(deblur, 40);
+    if (deblur) sharpen = Math.min(sharpen, 25);
+    const denoiseAll = deblur && a.sigma > 2 ? Math.max(denoise, 35) : denoise; // deblurring brings grain back up
     const side = Math.max(w, h);
     let up = side <= 640 ? 4 : side <= 1400 ? 2 : 1;
     while (up > 1 && w * h * up * up > EXPORT_MAX) up /= 2;
     return {
-      denoise, sharpen,
+      denoise: denoiseAll, sharpen,
       tone: range < 0.82 ? 100 : 70,
       exposure: a.median < 0.25 ? 0.4 : a.median > 0.72 ? -0.3 : 0,
       shadows: c((0.45 - a.median) * 180, 0, 60),
@@ -822,6 +1119,10 @@ function processImage(m) {
       wb: c(cast * 2200, 20, 100),
       warmth: 0,
       color: a.chroma < 0.06 ? 25 : 12,
+      deblur, blurType: shake ? "motion" : "focus",
+      blurSize: Math.round(Math.min(4, Math.max(0.5, a.blurSigma >= 0.5 ? a.blurSigma : 1.5)) * 10) / 10,
+      motionLen: c(a.shakeLen || 9, 3, 40), blurAngle: Math.round(a.blurAngle) % 180,
+      detail: up > 1 ? 75 : 0,
       up
     };
   }
@@ -960,9 +1261,11 @@ function processImage(m) {
   let busy = false, dirty = false, timer = 0;
   function requestRender(delay = 110) { clearTimeout(timer); timer = setTimeout(renderPreview, delay); }
   function previewInput() {
+    // Deblurring is the slow step, so its live preview works on a smaller copy; saving uses full size.
     const s = state.src, out = s.w * s.h * state.up * state.up;
-    if (out <= PREVIEW_MAX) return { w: s.w, h: s.h, data: state.srcData.data, rs: 1 };
-    const p = Math.sqrt(PREVIEW_MAX / out), w = Math.max(1, Math.round(s.w * p)), h = Math.max(1, Math.round(s.h * p));
+    const p = Math.min(1, Math.sqrt(PREVIEW_MAX / out), state.params.deblur > 0 ? Math.sqrt(DEBLUR_PREVIEW_SRC / (s.w * s.h)) : 1);
+    if (p >= 1) return { w: s.w, h: s.h, data: state.srcData.data, rs: 1 };
+    const w = Math.max(1, Math.round(s.w * p)), h = Math.max(1, Math.round(s.h * p));
     if (!state.previewCache || state.previewCache.w !== w || state.previewCache.h !== h) {
       const c = document.createElement("canvas"); c.width = w; c.height = h;
       const ctx = c.getContext("2d", { willReadFrequently: true }); ctx.imageSmoothingQuality = "high";
@@ -977,7 +1280,7 @@ function processImage(m) {
     busy = true; setStatus("Processing…", true);
     const photo = current, srcCanvas = state.srcCanvas, inp = previewInput(), t0 = performance.now();
     try {
-      const r = await call({ type: "process", w: inp.w, h: inp.h, data: new Uint8ClampedArray(inp.data), P: { ...state.params }, up: state.up, rs: inp.rs });
+      const r = await call({ type: "process", w: inp.w, h: inp.h, data: new Uint8ClampedArray(inp.data), P: { ...state.params, noise: state.analysis.sigma }, up: state.up, rs: inp.rs });
       if (photo === current) {
         state.previewScale = inp.rs;
         cvA.width = r.W; cvA.height = r.H;
@@ -998,9 +1301,9 @@ function processImage(m) {
   }
 
   // ---------- Saving ----------
-  async function renderFull(p) {
+  async function renderFull(p, onProgress) {
     const P = p === current ? state : p, s = P.src;
-    const r = await call({ type: "process", w: s.w, h: s.h, data: new Uint8ClampedArray(pixelsOf(P).data), P: { ...P.params }, up: P.up, rs: 1 });
+    const r = await call({ type: "process", w: s.w, h: s.h, data: new Uint8ClampedArray(pixelsOf(P).data), P: { ...P.params, noise: P.analysis.sigma }, up: P.up, rs: 1 }, onProgress);
     const c = document.createElement("canvas"); c.width = r.W; c.height = r.H;
     c.getContext("2d").putImageData(new ImageData(r.out, r.W, r.H), 0, 0);
     const png = state.fmt === "png";
@@ -1040,7 +1343,7 @@ function processImage(m) {
     const msg = $("#saveStatus");
     setSaving(true); msg.textContent = "Rendering full size…";
     try {
-      const r = await renderFull(current);
+      const r = await renderFull(current, f => { msg.textContent = `Rendering full size… ${Math.round(f * 100)}%`; });
       const res = await offer(r.blob, r.filename, true);
       msg.textContent = res === "saved" ? `Saved ${r.filename} (${r.W} × ${r.H} px).` : OFFER_MSG[res];
     } catch (err) {
@@ -1055,7 +1358,7 @@ function processImage(m) {
     try {
       for (let i = 0; i < list.length; i++) {
         msg.textContent = `Rendering ${i + 1} of ${list.length}…`;
-        const r = await renderFull(list[i]);
+        const r = await renderFull(list[i], f => { msg.textContent = `Rendering ${i + 1} of ${list.length}… ${Math.round(f * 100)}%`; });
         let name = r.filename, n = 2;
         while (used.has(name)) name = r.filename.replace(/(\.[a-z]+)$/, `-${n++}$1`);
         used.add(name);
@@ -1161,16 +1464,28 @@ function processImage(m) {
     const sctx = small.getContext("2d", { willReadFrequently: true }); sctx.imageSmoothingQuality = "medium";
     sctx.drawImage(big, 0, 0, w, h);
     const id = sctx.getImageData(0, 0, w, h), d = id.data, R = rng(42);
+    // Out-of-focus blur: three box passes approximate a Gaussian of about 1.4 px.
+    const tmpRow = new Float32Array(Math.max(w, h));
+    for (let pass = 0; pass < 3; pass++) for (let c = 0; c < 3; c++) {
+      for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) tmpRow[x] = d[(y * w + x) * 4 + c];
+        for (let x = 0; x < w; x++) d[(y * w + x) * 4 + c] = (tmpRow[Math.max(0, x - 1)] + tmpRow[x] + tmpRow[Math.min(w - 1, x + 1)]) / 3;
+      }
+      for (let x = 0; x < w; x++) {
+        for (let y = 0; y < h; y++) tmpRow[y] = d[(y * w + x) * 4 + c];
+        for (let y = 0; y < h; y++) d[(y * w + x) * 4 + c] = (tmpRow[Math.max(0, y - 1)] + tmpRow[y] + tmpRow[Math.min(h - 1, y + 1)]) / 3;
+      }
+    }
     const gauss = () => Math.sqrt(-2 * Math.log(R() + 1e-9)) * Math.cos(2 * Math.PI * R());
     for (let i = 0; i < d.length; i += 4) {
-      const n = gauss() * 10;
+      const n = gauss() * 5;
       let r = d[i] / 255, g = d[i + 1] / 255, b = d[i + 2] / 255;
       r = Math.pow(0.16 + 0.6 * r, 1.3) * 1.08 + 0.02; g = Math.pow(0.16 + 0.6 * g, 1.3) * 1.0; b = Math.pow(0.16 + 0.6 * b, 1.3) * 0.74;
-      d[i] = r * 255 + n + gauss() * 6; d[i + 1] = g * 255 + n + gauss() * 6; d[i + 2] = b * 255 + n + gauss() * 6;
+      d[i] = r * 255 + n + gauss() * 3; d[i + 1] = g * 255 + n + gauss() * 3; d[i + 2] = b * 255 + n + gauss() * 3;
     }
     sctx.putImageData(id, 0, 0);
     const img = new Image();
-    await new Promise(res => { img.onload = res; img.src = small.toDataURL("image/jpeg", 0.35); });
+    await new Promise(res => { img.onload = res; img.src = small.toDataURL("image/jpeg", 0.55); });
     const p = await addPhoto(img, "harbour-sample.jpg", { label: "Sample photo", sample: true });
     activate(p);
   }
