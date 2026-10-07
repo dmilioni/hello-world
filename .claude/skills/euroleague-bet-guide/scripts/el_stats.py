@@ -8,6 +8,13 @@ Usage:
   el_stats.py schedule [--season E2026] [--teams OLY,PAN] [--from-round N] [--to-round N]
   el_stats.py team TEAM [--season E2026] [--last N]
   el_stats.py h2h TEAM_A TEAM_B [--season E2025]
+  el_stats.py check TEAM "PLAYER:STAT>=N" ["PLAYER:STAT<=N" ...] [--last 3] [--season E2026]
+
+check: hit rate of each pick over the team's last N played EuroLeague games.
+  PLAYER is any part of the name (e.g. SARIC, MILLER). STAT is one of
+  pts reb ast 3pm 2pm stl blk pra pr pa ra. Use >= for "N+" and "Over N-0.5",
+  <= for "Under N+0.5" (Under 4.5 rebounds -> reb<=4). Games the player did
+  not play count as misses.
 
 Team codes: OLY Olympiacos, PAN Panathinaikos, IST Anadolu Efes, ULK Fenerbahce,
 MAD Real Madrid, BAR Barcelona, RED Crvena Zvezda, PAR Partizan, ZAL Zalgiris,
@@ -143,6 +150,60 @@ def cmd_team(args):
     player_table(args.team, args.season, played[-args.last:] if args.last else played)
 
 
+STATS = {
+    "pts": lambda p: p["Points"],
+    "reb": lambda p: p["TotalRebounds"],
+    "ast": lambda p: p["Assistances"],
+    "3pm": lambda p: p["FieldGoalsMade3"],
+    "2pm": lambda p: p["FieldGoalsMade2"],
+    "stl": lambda p: p["Steals"],
+    "blk": lambda p: p["BlocksFavour"],
+    "pra": lambda p: p["Points"] + p["TotalRebounds"] + p["Assistances"],
+    "pr": lambda p: p["Points"] + p["TotalRebounds"],
+    "pa": lambda p: p["Points"] + p["Assistances"],
+    "ra": lambda p: p["TotalRebounds"] + p["Assistances"],
+}
+
+
+def parse_pick(spec):
+    name, rest = spec.split(":", 1)
+    op = ">=" if ">=" in rest else "<="
+    stat, line = rest.split(op)
+    stat = stat.strip().lower()
+    if stat not in STATS:
+        sys.exit(f"Unknown stat '{stat}' in {spec}. Use one of: {' '.join(STATS)}")
+    return name.strip().upper(), stat, op, float(line)
+
+
+def cmd_check(args):
+    played = [g for g in schedule(args.season)
+              if g["played"] == "true" and args.team in (g["homecode"], g["awaycode"])]
+    played.sort(key=lambda g: g["gameday"])
+    games = played[-args.last:]
+    boxes = [box(args.season, g["code"]) for g in games]
+    rounds = ",".join(f"R{g['gameday']}" for g in games)
+    print(f"{args.team} last {len(games)} EuroLeague games ({rounds}), official box scores")
+    for spec in args.picks:
+        name, stat, op, line = parse_pick(spec)
+        values, label = [], name
+        for b in boxes:
+            found = None
+            for s in b["Stats"]:
+                for p in s["PlayersStats"]:
+                    if p["Team"] == args.team and name in p["Player"].upper():
+                        found = p
+            if found is None or minutes(found["Minutes"]) == 0:
+                values.append(None)
+            else:
+                label = found["Player"].strip()
+                values.append(STATS[stat](found))
+        hits = sum(1 for v in values if v is not None and (v >= line if op == ">=" else v <= line))
+        shown = ", ".join("DNP" if v is None else str(v) for v in values)
+        n = len(values)
+        verdict = "OK" if hits == n else ("WEAK" if hits == n - 1 else "FAIL")
+        print(f"{verdict:4s} {hits}/{n}  {label}: {stat} {op} {line:g}   [{shown}]")
+
+
 def cmd_h2h(args):
     pair = {args.team_a, args.team_b}
     games = [g for g in schedule(args.season)
@@ -171,8 +232,13 @@ def main():
     h.add_argument("team_a")
     h.add_argument("team_b")
     h.add_argument("--season", default="E2025")
+    c = sub.add_parser("check")
+    c.add_argument("team")
+    c.add_argument("picks", nargs="+")
+    c.add_argument("--last", type=int, default=3)
+    c.add_argument("--season", default="E2026")
     args = ap.parse_args()
-    {"schedule": cmd_schedule, "team": cmd_team, "h2h": cmd_h2h}[args.cmd](args)
+    {"schedule": cmd_schedule, "team": cmd_team, "h2h": cmd_h2h, "check": cmd_check}[args.cmd](args)
 
 
 if __name__ == "__main__":

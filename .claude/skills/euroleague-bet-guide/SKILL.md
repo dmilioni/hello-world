@@ -121,6 +121,39 @@ Rules of thumb:
 - Avoid props on players who are questionable, just back from injury, or in a minutes battle.
 - The game-winner and the handicap are close to fair. Use them only when they fit the slip (for example a team-win pick with that team's scorers going "over").
 
+## Step 4b — Check every pick against the last 3 games (mandatory)
+
+Before any pick goes on a slip, check it against the player's **last 3 EuroLeague games** in the official box scores, using the helper script. Pass all the picks of one team in a single call:
+
+```bash
+S=.claude/skills/euroleague-bet-guide/scripts/el_stats.py
+python3 -I $S check IST "SARIC:ra>=7" "STRAZEL:pts>=12" "FERNANDO:reb<=4"
+python3 -I $S check OLY "MILLER:ast>=6" "VEZENKOV:reb>=5" "VEZENKOV:pra>=26"
+```
+
+How to write a pick:
+- "N+" or "Over N−0.5" becomes `>=N`; "Under N+0.5" becomes `<=N`. For example, Under 4.5 rebounds is `reb<=4`.
+- Combined markets: Π+Ρ+Α → `pra`, Π+Ρ → `pr`, Π+Α → `pa`, Ρ+Α → `ra`.
+- Threes made → `3pm`, twos made → `2pm`.
+
+The script prints **OK** (3/3), **WEAK** (2/3) or **FAIL** (1/3 or 0/3), with the three values.
+
+**Rules:**
+
+| Slip | Allowed picks |
+|---|---|
+| Low risk (≈5x) | **Only OK (3/3).** |
+| Medium (20–25x) | OK, plus **at most one WEAK** (2/3). |
+| High (50–80x) | OK and WEAK. **At most three WEAK.** |
+| Any slip | **Never FAIL** (1/3 or 0/3). |
+
+- **A FAIL pick is dropped.** Replace it with a market on the same player that passes, for example Šarić 7+ rebounds (FAIL: 5, 3, 10) → Šarić 7+ Ρ+Α (OK: 7, 7, 11). Or move the line one step towards safety.
+- **The only exception** is a clear role change, for example the starter at that position is now out. Even then, never use the pick on the low slip, label it "role change, FAIL on last 3", and explain why.
+- **Players with fewer than 3 EuroLeague games this season** (new signings, players back from injury, DNPs) are treated as unproven. Don't use their props, and flag them.
+- **Team picks** (winner, handicap, team totals, team rebounds or threes, "most …" markets): check the team's last 3 results the same way, by hand, from the `team` command.
+- **National-league games** (Greek league, Turkish league and so on) are not in the script. If the last game was a national-league game, mention it as unofficial context, but the pass/fail rule uses the 3 EuroLeague games.
+- **After any swap,** re-run `check` on the final picks so every leg on every slip has a result.
+
 ## Step 5 — Build the three slips
 
 **Key principle:** for a fixed total payout, win probability = Π(your p) = Π(edge) ÷ total odds. So, to maximise the chance of winning:
@@ -148,7 +181,7 @@ For each game:
 3. **News:** injuries, returns, fatigue and travel notes.
 4. **Prediction:** score, total, win probability, first-scorer and first-rebound top 4–6 with probabilities.
 5. **Top 5 most likely stats,** each with its odds, Stoiximan's implied probability and your probability.
-6. **Three slips** as tables (pick — Stoiximan market name — odds), then the total odds and the estimated chance of winning.
+6. **Three slips** as tables with columns pick — Stoiximan market name — odds — **last 3** (for example `3/3 [6, 6, 8]`), then the total odds and the estimated chance of winning. Every leg must show its last-3 result from Step 4b.
 7. **Offers used,** and how the slip qualifies.
 8. **Before you bet:** line-up checks with a specific swap for each (for example "if X is out, swap leg 4 for …"), and a note that the app's total may differ because of correlation repricing.
 9. **Stake guidance:** a small fixed fraction of the balance (for example 10% on the 5x slip, 5% on the 20–25x slip, 2–3% on the 50–80x slip). Remind the user, once and briefly, that these are estimates and that every slip can lose.
