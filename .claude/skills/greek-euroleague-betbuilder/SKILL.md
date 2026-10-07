@@ -17,7 +17,7 @@ Every pick must be a Bet Builder (BB) market from the same game.
 
 ## Step 1 — Find the games
 
-1. Work out today's date and look ahead about 7 days. Search the EuroLeague calendar for OLY and PAO games in that window. Use searches in English and Greek, for example `Ολυμπιακός επόμενος αγώνας EuroLeague` and `Παναθηναϊκός πρόγραμμα EuroLeague`. Note the round, date, Greek time, venue and opponent.
+1. Work out today's date and look ahead about 7 days. Find OLY and PAO games in that window on the **official EuroLeague schedule** (`euroleaguebasketball.net/en/euroleague/game-center/`), which is the ground truth for dates, times and venues. Greek searches such as `Ολυμπιακός επόμενος αγώνας EuroLeague` can help you find the game, but if a date or time disagrees with the official site, use the official one. Note the round, date, Greek time, venue and opponent.
 2. If neither team plays within about 48 hours, list the next game dates and stop. Bets are only made close to the game, because odds and line-ups change.
 3. Treat each game separately. If both teams play, produce two full reports.
 
@@ -36,18 +36,28 @@ Every pick must be a Bet Builder (BB) market from the same game.
 
 Search in English and Greek.
 
-**Always check Gazzetta's EuroLeague section first** for news, 12-man lists, injuries, the coach's press conference and live reports: `https://www.gazzetta.gr/basketball/euroleague`. Use `https://www.gazzetta.gr/basketball/stoiximan-gbl` for Greek league games. Fetch the pages directly; if fetching is blocked, run WebSearch with `allowed_domains: ["gazzetta.gr"]` and queries such as `Ολυμπιακός 12άδα Εφές` or `Παναθηναϊκός τραυματίες`.
+### Ground truth: the official EuroLeague site
 
-**Always check the official EuroLeague site** at `https://www.euroleaguebasketball.net/en/`. Use it for:
+**`https://www.euroleaguebasketball.net/en/` is the ground truth for every EuroLeague fact.** That covers the schedule, venue and tip-off time, final scores, box scores, player and team stats, and the official injury report. Check it first, every time:
 - the schedule and results (`/en/euroleague/game-center/`);
-- full box scores per game (minutes, points, rebounds, assists, 3PM, PIR), which are the most reliable source for player stats;
+- full box scores per game (minutes, points, rebounds, assists, 3PM, PIR);
 - player and team stats (`/en/euroleague/stats/`);
 - the per-round injury report (search "Injury report: Round N");
 - "Game Facts" and "Game Notes" previews for each game.
 
-Fetch the pages directly; if fetching is blocked, run WebSearch with `allowed_domains: ["euroleaguebasketball.net"]`, for example `Olympiacos Anadolu Efes game center 2026-27` or `injury report round 4`. When stats from other sites conflict with the official box score, trust the official one.
+Fetch the pages directly; if fetching is blocked, run WebSearch with `allowed_domains: ["euroleaguebasketball.net"]`, for example `Olympiacos Anadolu Efes game center 2026-27` or `injury report round 4`.
 
-**Always check BasketNews** at `https://basketnews.com`. Use it for:
+How to apply it:
+- **If any other source disagrees with the official site, the official site wins.** Use its number and do not average or blend it with others.
+- **If the official site hasn't published something yet** (for example the round's injury report or a box score), you may use other sources, but label the fact "unofficial" in the report. Re-check the official site before the final slips and correct anything that changed.
+- **Greek league and other national-league games are not on the official EuroLeague site.** For those, esake.gr is the official source, and Gazzetta or BasketNews are next.
+- In the output, mark each stat as (official) or (unofficial), and list the official EuroLeague links first in Sources.
+
+### Secondary sources: news, line-ups and context
+
+**Gazzetta's EuroLeague section** (`https://www.gazzetta.gr/basketball/euroleague`): news, 12-man lists, the coach's press conference and live reports. Use `https://www.gazzetta.gr/basketball/stoiximan-gbl` for Greek league games. Fetch the pages directly; if fetching is blocked, run WebSearch with `allowed_domains: ["gazzetta.gr"]` and queries such as `Ολυμπιακός 12άδα Εφές` or `Παναθηναϊκός τραυματίες`.
+
+**BasketNews** (`https://basketnews.com`). Use it for:
 - the daily-updated EuroLeague injury report (search "EuroLeague Injury Report (updated daily)");
 - team pages with roster, schedule and stats (for example `/teams/460-olympiacos-piraeus.html`, `/teams/583-anadolu-efes-istanbul.html`);
 - player pages with game logs across EuroLeague and national leagues;
@@ -55,7 +65,7 @@ Fetch the pages directly; if fetching is blocked, run WebSearch with `allowed_do
 
 Fetch the pages directly; if fetching is blocked, run WebSearch with `allowed_domains: ["basketnews.com"]`, for example `Olympiacos injury` or `Vezenkov stats`.
 
-Other useful sources: eurohoops.net (EN and EL), sofascore.com news, esake.gr (Greek league), sport24.gr, sportal.gr, sdna.gr, in.gr, and opponent-language press. Many of these sites are blocked from fetching, so use the search-result summaries, cross-check numbers across two sources, and flag any conflicts.
+Other useful sources: eurohoops.net (EN and EL), sofascore.com news, esake.gr (Greek league), sport24.gr, sportal.gr, sdna.gr, in.gr, and opponent-language press. Many of these sites are blocked from fetching, so use the search-result summaries. Cross-check numbers across two sources, and check them against the official EuroLeague site whenever it has them.
 
 Collect:
 
@@ -130,7 +140,8 @@ For each game:
 
 ## Hard rules
 
-- Never invent odds, stats or injury news. If a number is uncertain, say so; if sources conflict, show both.
+- Never invent odds, stats or injury news. If a number is uncertain, say so.
+- The official EuroLeague site (euroleaguebasketball.net) is the ground truth for every EuroLeague fact. When sources conflict, use the official figure and mention the conflict only briefly. Label anything not yet published there as unofficial.
 - Never include a player whose availability is unconfirmed without giving a swap.
 - Never promise or imply a guaranteed win, and never encourage chasing losses or increasing stakes after a loss.
 - If the user's balance or behaviour suggests stress about money, say so gently and suggest pausing.
