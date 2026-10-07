@@ -25,7 +25,9 @@ Every pick must be a Bet Builder (BB) market from the same game.
 
 **Stoiximan (`https://www.stoiximan.gr/`) is the only bookmaker for this skill.** All picks, odds, Bet Builder markets and offers come from Stoiximan. Never use other bookmakers' odds, or odds from tipster or aggregator sites, as a substitute; they may only be mentioned as context.
 
-1. Open `https://www.stoiximan.gr/` and go to Μπάσκετ → EuroLeague → the game, with Bet Builder switched on. Also open the offers page (Προσφορές). Try WebFetch first. Stoiximan loads its odds with JavaScript, so if WebFetch returns no odds, try the pre-installed Chromium through Playwright and read the rendered page. If the host is blocked by the network policy, tell the user once that `stoiximan.gr` must be added to Allowed domains in the cloud environment's Network access settings.
+1. Open `https://www.stoiximan.gr/` and go to Μπάσκετ → EuroLeague → the game, with Bet Builder switched on. Also open the offers page (Προσφορές). Use one quick `curl` check.
+   - **Tested 7/10/2026: the domain is allowed, but Stoiximan geo-blocks cloud sessions.** It returns 403 with the message "According to the local regulatory provisions, our services cannot be accessed from your location", because the sessions run outside Greece.
+   - When you get that 403, don't retry and don't look for workarounds. Go straight to the screenshots step below.
 2. **If you cannot read the odds, stop and ask the user for screenshots.** Do not guess the odds. Ask for these sections:
    - **Κύριες Αγορές:** winner, handicap and total.
    - **Player ladders and O/U lines:** Πόντοι, Ριμπάουντ, Ασίστ, Εύστοχα Τρίποντα, Εύστοχα Δίποντα, Π+Ρ+Α, Π+Α, Ρ+Α, Double-Double, Επιθετικά/Αμυντικά Ριμπάουντ.
