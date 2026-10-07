@@ -38,7 +38,16 @@ Search in English and Greek.
 
 **Always check Gazzetta's EuroLeague section first** for news, 12-man lists, injuries, the coach's press conference and live reports: `https://www.gazzetta.gr/basketball/euroleague`. Use `https://www.gazzetta.gr/basketball/stoiximan-gbl` for Greek league games. Fetch the pages directly; if fetching is blocked, run WebSearch with `allowed_domains: ["gazzetta.gr"]` and queries such as `Ολυμπιακός 12άδα Εφές` or `Παναθηναϊκός τραυματίες`.
 
-Other useful sources: euroleaguebasketball.net (game centers, game facts, injury reports), eurohoops.net (EN and EL), basketnews.com, sofascore.com news, esake.gr (Greek league), sport24.gr, sportal.gr, sdna.gr, in.gr, and opponent-language press. Many of these sites are blocked from fetching, so use the search-result summaries, cross-check numbers across two sources, and flag any conflicts.
+**Always check the official EuroLeague site** at `https://www.euroleaguebasketball.net/en/`. Use it for:
+- the schedule and results (`/en/euroleague/game-center/`);
+- full box scores per game (minutes, points, rebounds, assists, 3PM, PIR), which are the most reliable source for player stats;
+- player and team stats (`/en/euroleague/stats/`);
+- the per-round injury report (search "Injury report: Round N");
+- "Game Facts" and "Game Notes" previews for each game.
+
+Fetch the pages directly; if fetching is blocked, run WebSearch with `allowed_domains: ["euroleaguebasketball.net"]`, for example `Olympiacos Anadolu Efes game center 2026-27` or `injury report round 4`. When stats from other sites conflict with the official box score, trust the official one.
+
+Other useful sources: eurohoops.net (EN and EL), basketnews.com, sofascore.com news, esake.gr (Greek league), sport24.gr, sportal.gr, sdna.gr, in.gr, and opponent-language press. Many of these sites are blocked from fetching, so use the search-result summaries, cross-check numbers across two sources, and flag any conflicts.
 
 Collect:
 
