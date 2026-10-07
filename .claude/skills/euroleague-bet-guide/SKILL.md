@@ -1,9 +1,9 @@
 ---
-name: greek-euroleague-betbuilder
+name: euroleague-bet-guide
 description: Before each EuroLeague game of Olympiacos or Panathinaikos, research the game (calendar, player form in EuroLeague and the Greek league, news, injuries, travel and fatigue, last season's head-to-head) and propose three Stoiximan.gr Bet Builder slips — low risk about 5x, medium 20–25x, high 50–80x — built for the highest chance of winning at each payout. Use when the user asks for bets, a bet builder, προγνωστικά or a betting plan for an Olympiacos or Panathinaikos game, or sends Stoiximan screenshots for one.
 ---
 
-# Olympiacos / Panathinaikos EuroLeague Bet Builder
+# Euroleague_Bet_Guide — Olympiacos / Panathinaikos Bet Builder
 
 Deliver, for **every upcoming EuroLeague game of Olympiacos (OLY) and Panathinaikos (PAO)**, three Stoiximan Bet Builder slips:
 
