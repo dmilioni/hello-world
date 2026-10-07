@@ -61,6 +61,8 @@ python3 -I $S team IST --last 3              # opponent, last 3 games only
 python3 -I $S h2h OLY IST --season E2025     # last season's head-to-head with full player lines
 ```
 
+On Windows, if `python3` is not found, use `py` or `python` instead, with the same arguments.
+
 Use it for the schedule, scores, box scores, season averages, starters, minutes load, and first scorer / first rebound history. The website itself (`euroleaguebasketball.net`) blocks automated browsers with a Vercel security check, so don't fetch it. For news that only the website has (the injury report, Game Facts), run WebSearch with `allowed_domains: ["euroleaguebasketball.net"]`, for example `injury report round 4`.
 
 How to apply it:
