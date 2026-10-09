@@ -156,6 +156,20 @@ The script prints **OK** (3/3), **WEAK** (2/3) or **FAIL** (1/3 or 0/3), with th
 - **National-league games** (Greek league, Turkish league and so on) are not in the script. If the last game was a national-league game, mention it as unofficial context, but the pass/fail rule uses the 3 EuroLeague games.
 - **After any swap,** re-run `check` on the final picks so every leg on every slip has a result.
 
+**Minutes and margin flags** (printed by `check` next to the result):
+- **LOW-MIN** (a game under 18 minutes) or **MIN-DROP** (last game's minutes under 75% of the earlier ones): the player's role is uncertain. **Not allowed on the low-risk slip.** On the other slips, only with a stated reason.
+  - Lesson from PAO–FEN, 8/10: Melli's minutes fell to 13 when Bingham started, and all three Melli picks lost.
+- **THIN-MARGIN** (points line above 65% of the player's last-3 average): points are volatile. **Not allowed on the low-risk slip.**
+  - Lesson from PAO–FEN: Yabusele 9+ points (average 13) lost with 8.
+- **On the low-risk slip, prefer rebounds, assists and their combinations over pure points.**
+
+**Rotation assumptions:**
+- **Don't assume a returning player takes minutes from others in his first 1–2 games back.** Returning players usually play little.
+  - Lesson from PAO–FEN: Fall played 2 minutes, Lessort played his usual 23 and had 8 rebounds, so "Lessort under 6.5 rebounds" lost.
+- **Don't bet against a player's last-3 numbers because of a rotation guess.** If the guess matters, skip the market.
+
+**Back-testing:** `check TEAM --before R "…"` scores picks against the 3 games before round R. Use it to test the method on past games.
+
 ## Step 5 — Build the three slips
 
 **Key principle:** for a fixed total payout, win probability = Π(your p) = Π(edge) ÷ total odds. So, to maximise the chance of winning:
@@ -182,6 +196,10 @@ For each game:
 2. **Form table:** last 3–5 games for both teams with key player lines, plus points scored and allowed per game.
 3. **News:** injuries, returns, fatigue and travel notes.
 4. **Prediction:** score, total, win probability, first-scorer and first-rebound top 4–6 with probabilities.
+   - **Score and margin:** start from each team's official points scored and allowed per game this season (from the `team` command), then add about +3 for home court. Don't shrink a strong team's margin towards a close game without a concrete reason such as injuries.
+     - Lesson from PAO–FEN: PAO had been winning by 21 a game at home. I predicted +5; the result was +18.
+   - **First scorer and first rebound: only the 10 starters can realistically be first.** Use the starters (marked `*`) from each team's last game and the first-scorer / first-rebound history that the `team` command prints. Never list bench players.
+     - Lesson from PAO–FEN: I gave Francisco, Lessort, Baldwin and Hayes-Davis 9–16% each, but all four come off the bench. Mitoglou, a starter who had also scored first in the previous game, scored first.
 5. **Top 5 most likely stats,** each with its odds, Stoiximan's implied probability and your probability.
 6. **Three slips** as tables with columns pick — Stoiximan market name — odds — **last 3** (for example `3/3 [6, 6, 8]`), then the total odds and the estimated chance of winning. Every leg must show its last-3 result from Step 4b.
 7. **Offers used,** and how the slip qualifies.
@@ -190,6 +208,17 @@ For each game:
 10. **Sources** list with links.
 11. **Save the report** as Markdown to `reports/YYYY-MM-DD_HOME-AWAY.md` in the repo folder (for example `reports/2026-10-09_OLY-IST.md`), using the game date, and tell the user the path. Terminal windows on Windows often cut wide tables, so the file is the readable copy. Do not commit it.
 12. **Phone notification:** after the report is delivered, call the `PushNotification` tool (load it with ToolSearch `select:PushNotification` if needed). Send one line under 200 characters with the game and the three slips' total odds and estimated chance of winning, for example `OLY-EFS slips ready: 5.0x (24%) · 22x (5%) · 64x (1.6%). Open Claude to see the picks.`. When Remote Control is connected, this reaches the user's phone.
+
+## Step 7 — Review past slips (start of every run)
+
+Before building new slips, look in `reports/` for reports of games that have been played since they were written. For each one:
+1. Run `check TEAM --game GAMECODE "…"` for every leg, for both teams. Game codes come from the `schedule` command.
+2. Append a **Review** section to that report:
+   - each slip: WON or LOST, and which legs failed with the actual value and minutes;
+   - the predicted score against the actual score;
+   - the first scorer and first rebound against the prediction.
+3. Write 1–3 lessons in one line each. If a lesson is a new rule, add it to this skill and tell the user.
+4. Show the user a short summary of the review before the new report.
 
 ## Hard rules
 

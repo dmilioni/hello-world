@@ -14,7 +14,11 @@ check: hit rate of each pick over the team's last N played EuroLeague games.
   PLAYER is any part of the name (e.g. SARIC, MILLER). STAT is one of
   pts reb ast 3pm 2pm stl blk pra pr pa ra. Use >= for "N+" and "Over N-0.5",
   <= for "Under N+0.5" (Under 4.5 rebounds -> reb<=4). Games the player did
-  not play count as misses.
+  not play count as misses. Flags: LOW-MIN (a game under 18 minutes),
+  MIN-DROP (last game's minutes under 75% of the earlier ones), THIN-MARGIN
+  (points line above 65% of the player's average).
+  --before R  back-tests: uses the last N games before round R.
+  --game G    post-game review: scores the picks against game code G (WON/LOST).
 
 Team codes: OLY Olympiacos, PAN Panathinaikos, IST Anadolu Efes, ULK Fenerbahce,
 MAD Real Madrid, BAR Barcelona, RED Crvena Zvezda, PAR Partizan, ZAL Zalgiris,
@@ -179,20 +183,30 @@ def cmd_check(args):
     played = [g for g in schedule(args.season)
               if g["played"] == "true" and args.team in (g["homecode"], g["awaycode"])]
     played.sort(key=lambda g: g["gameday"])
-    games = played[-args.last:]
+    if args.game:
+        games = [g for g in played if g["code"] == args.game]
+    elif args.before:
+        games = [g for g in played if g["gameday"] < args.before][-args.last:]
+    else:
+        games = played[-args.last:]
+    if not games:
+        sys.exit("No matching played games.")
     boxes = [box(args.season, g["code"]) for g in games]
     rounds = ",".join(f"R{g['gameday']}" for g in games)
-    print(f"{args.team} last {len(games)} EuroLeague games ({rounds}), official box scores")
+    title = "result of" if args.game else f"last {len(games)} EuroLeague games before R{args.before}:" if args.before else f"last {len(games)} EuroLeague games"
+    print(f"{args.team} {title} ({rounds}), official box scores")
     for spec in args.picks:
         name, stat, op, line = parse_pick(spec)
-        values, label = [], name
+        values, mins, label = [], [], name
         for b in boxes:
             found = None
             for s in b["Stats"]:
                 for p in s["PlayersStats"]:
                     if p["Team"] == args.team and name in p["Player"].upper():
                         found = p
-            if found is None or minutes(found["Minutes"]) == 0:
+            m = minutes(found["Minutes"]) if found else 0
+            mins.append(round(m))
+            if found is None or m == 0:
                 values.append(None)
             else:
                 label = found["Player"].strip()
@@ -200,8 +214,20 @@ def cmd_check(args):
         hits = sum(1 for v in values if v is not None and (v >= line if op == ">=" else v <= line))
         shown = ", ".join("DNP" if v is None else str(v) for v in values)
         n = len(values)
-        verdict = "OK" if hits == n else ("WEAK" if hits == n - 1 else "FAIL")
-        print(f"{verdict:4s} {hits}/{n}  {label}: {stat} {op} {line:g}   [{shown}]")
+        if args.game:
+            verdict = "WON" if hits == n else "LOST"
+        else:
+            verdict = "OK" if hits == n else ("WEAK" if hits == n - 1 else "FAIL")
+        flags = []
+        if not args.game:
+            if any(m < 18 for m in mins):
+                flags.append("LOW-MIN")
+            if len(mins) >= 2 and mins[-1] < 0.75 * (sum(mins[:-1]) / len(mins[:-1])):
+                flags.append("MIN-DROP")
+            if op == ">=" and stat == "pts" and None not in values and line > 0.65 * (sum(values) / n):
+                flags.append("THIN-MARGIN")
+        flag_txt = ("  <" + ", ".join(flags) + ">") if flags else ""
+        print(f"{verdict:4s} {hits}/{n}  {label}: {stat} {op} {line:g}   [{shown}]  min [{', '.join(map(str, mins))}]{flag_txt}")
 
 
 def cmd_h2h(args):
@@ -237,6 +263,8 @@ def main():
     c.add_argument("picks", nargs="+")
     c.add_argument("--last", type=int, default=3)
     c.add_argument("--season", default="E2026")
+    c.add_argument("--game", type=int, help="score picks against one played game (post-game review)")
+    c.add_argument("--before", type=int, help="use the last N games before this round (back-testing)")
     args = ap.parse_args()
     {"schedule": cmd_schedule, "team": cmd_team, "h2h": cmd_h2h, "check": cmd_check}[args.cmd](args)
 
