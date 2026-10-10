@@ -164,9 +164,24 @@ The script prints **OK** (3/3), **WEAK** (2/3) or **FAIL** (1/3 or 0/3), with th
 - **On the low-risk slip, prefer rebounds, assists and their combinations over pure points.**
 
 **Rotation assumptions:**
-- **Don't assume a returning player takes minutes from others in his first 1–2 games back.** Returning players usually play little.
+- **Returning player who has NOT played since the injury:** expect little playing time in the first 1–2 games back. Don't assume he takes minutes from others.
   - Lesson from PAO–FEN: Fall played 2 minutes, Lessort played his usual 23 and had 8 rebounds, so "Lessort under 6.5 rebounds" lost.
+- **Returning player who already played a national-league game since coming back:** treat him as back in his normal role. **Skip rebound overs on teammates at the same position.**
+  - Lesson from OLY–EFS: Milutinov (back in the Greek league) had 9 rebounds in 15 minutes, Ndiaye and T. Jones had 7 and 6, and Vezenkov fell to 3, so "Vezenkov 5+ rebounds" lost.
+- **New signing making his debut:** skip "over" picks on teammates at his position.
+  - Lesson from OLY–EFS: Payne played 14 minutes with 12 points, and Strazel dropped to 18 minutes and 7 points.
 - **Don't bet against a player's last-3 numbers because of a rotation guess.** If the guess matters, skip the market.
+
+**Blowout rule (big favourite):** when the main handicap is **9.5 or more**, or your predicted margin is 12 or more, starters on both sides usually play fewer minutes.
+- **No player "over" picks on the low-risk slip.**
+- **Build it from team markets** that suit the favourite: winner, a smaller handicap, team rebounds, "most rebounds" or "most defensive rebounds", and "under" picks on the underdog's team total.
+- **On the other slips,** player overs only at the lowest ladder step and only for players whose minutes held up in earlier blowouts (check the `team` output for the game with the biggest margin).
+  - Lesson from OLY–EFS (won by 23, line −10.5): Vezenkov played 22 minutes, Miller-McIntyre 13, Šarić 19 and Strazel 18. 11 of the 12 player picks lost, while all 3 team picks (Olympiacos to win, most defensive rebounds 28–23, Fernando under) won.
+
+**Team totals without a key scorer:** when a team's top scorer is out, lower its expected points by about 60% of his average, not 0%.
+- Lesson from OLY–EFS: Efes averaged 82.7 with Mike James but scored 66 without him. I predicted 80, and the total of 155 went well under the 172.5 line.
+
+**Calibration:** read `track_record.md` (next to this file) before choosing picks. When a market type keeps losing there, use it less.
 
 **Back-testing:** `check TEAM --before R "…"` scores picks against the 3 games before round R. Use it to test the method on past games.
 
@@ -218,6 +233,7 @@ Before building new slips, look in `reports/` for reports of games that have bee
    - the predicted score against the actual score;
    - the first scorer and first rebound against the prediction.
 3. Write 1–3 lessons in one line each. If a lesson is a new rule, add it to this skill and tell the user.
+4. Add one row per leg to `track_record.md` (game, pick, market type, odds, last-3 verdict before the game, result, actual value and minutes), and update the totals at the top of that file.
 4. Show the user a short summary of the review before the new report.
 
 ## Hard rules
