@@ -191,6 +191,34 @@ The script prints **OK** (3/3), **WEAK** (2/3) or **FAIL** (1/3 or 0/3), with th
 
 **Back-testing:** `check TEAM --before R "…"` scores picks against the 3 games before round R. Use it to test the method on past games.
 
+## Step 4c — Back-test reality check (read before building slips)
+
+`scripts/backtest.py` rebuilds the ≈5x slip for every past game using only data from earlier rounds, then scores it against the official result. Odds are model prices (normal model, 7% margin, minimum 1.10).
+
+```bash
+python3 -I scripts/backtest.py --rounds 4,5 --config tuned -v             # every slip, leg by leg
+python3 -I scripts/backtest.py --rounds 4,5 --config tuned --focus OLY,PAN
+python3 -I scripts/backtest.py --rounds 4,5 --grid                        # tune on the first round, test on the rest
+```
+
+**Results (14/10/2026, rounds 4–5, all 20 games; 50,400 rule variants tried):**
+
+| Finding | Number |
+|---|---|
+| Rule variants that won all 4 OLY/PAO 5x slips | **0 of 50,400** |
+| Best realistic 5x slip win rate across all games | **about 1 in 4 (18–25%)** |
+| The variant that won 2 of 4 OLY/PAO slips, on all other games | 1 of 13. It was fitted to those games, not better. |
+| Player legs with the line at the last-3 minimum that hit next game | 55–70% (assists 70%, Π+Ρ+Α 66%, points 62%, rebounds 57%) |
+| Legs priced 1.10–1.24 | hit 83% (bookmaker implied 85%), fairly priced |
+| Legs priced 1.25–1.59 picked this way | hit 55% (implied 68–76%), **overpriced, avoid** |
+| "Favourite to win" from early-season net rating | hit 53% (model 65%). Too few games for net rating to mean much yet. |
+
+**Rules that follow from this:**
+1. **A "3/3 OK" last-3 result is not a 90%+ pick.** Players fall back towards their average, so treat it as roughly 60–70%.
+2. **On the 5x slip, use only legs that Stoiximan prices 1.10–1.24, plus at most one leg at 1.25–1.39** if it has a clear reason (for example a confirmed role increase). Reaching 5x then takes 8–10 legs, which is why the realistic win rate is about 1 in 5.
+3. **Never present the 5x slip as likely to win.** Show the expected win chance (15–25%) and say that about 4 in 5 such slips lose.
+4. **Before the first game of each new round,** re-run `backtest.py --grid` with the latest rounds. Update the "tuned" config and this table only if the test-round result improves, not just the tuning round.
+
 ## Step 5 — Build the three slips
 
 **Key principle:** for a fixed total payout, win probability = Π(your p) = Π(edge) ÷ total odds. So, to maximise the chance of winning:
