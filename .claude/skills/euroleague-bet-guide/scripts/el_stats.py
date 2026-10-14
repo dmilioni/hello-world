@@ -13,7 +13,7 @@ Usage:
 
 minutes: average minutes per player by game type: easy win (by 10+),
   close win (by 1-9), loss, and derby (against OLY, PAN, MAD, BAR, ULK, IST,
-  ZAL, PAR, RED). DNP counts as 0. Use it to predict minutes for the game type
+  ZAL, PAR, RED), over the games he was on the roster. DNP counts as 0. Use it to predict minutes for the game type
   you expect.
 
 check: hit rate of each pick over the team's last N played EuroLeague games.
@@ -262,14 +262,15 @@ def cmd_minutes(args):
                         for c in cats:
                             data.setdefault(p["Player"].strip(), {}).setdefault(c, []).append(minutes(p["Minutes"]))
         print(f"\n{args.team} {season} games: " + ", ".join(f"{c} {counts.get(c, 0)}" for c in GAME_TYPES))
-        print(f"{'player':26s}" + "".join(f"{c:>11s}" for c in GAME_TYPES) + "   avg minutes, DNP = 0")
+        print(f"{'player':26s}" + "".join(f"{c:>11s}" for c in GAME_TYPES) + "   avg minutes (games), DNP = 0")
         rows = []
         for name, d in data.items():
             total = sum(sum(v) for k, v in d.items() if k != "derby")
             if total >= 30:
                 rows.append((total, name, d))
         for _, name, d in sorted(rows, reverse=True):
-            cells = "".join(f"{sum(d.get(c, [])) / counts[c]:11.1f}" if counts.get(c) else f"{'-':>11s}"
+            # average over games he was on the roster (in the box score; DNP = 0)
+            cells = "".join(f"{sum(d[c]) / len(d[c]):8.1f} ({len(d[c])})" if d.get(c) else f"{'-':>11s}"
                             for c in GAME_TYPES)
             print(f"{name[:26]:26s}{cells}")
 
