@@ -181,6 +181,12 @@ The script prints **OK** (3/3), **WEAK** (2/3) or **FAIL** (1/3 or 0/3), with th
 **Team totals without a key scorer:** when a team's top scorer is out, lower its expected points by about 60% of his average, not 0%.
 - Lesson from OLY–EFS: Efes averaged 82.7 with Mike James but scored 66 without him. I predicted 80, and the total of 155 went well under the 172.5 line.
 
+**Game totals:** don't use game-total over/under on any slip. In R4–R5 the totals ranged from 127 to 199 against lines of about 160–172, which is too unpredictable.
+
+**Minutes matter more than the starter label:** use each player's minutes, not whether he starts.
+- Lesson from R5: Montero came off the bench and played 31 minutes for 26 points. Miller-McIntyre started but played 13–14 minutes in two straight games.
+- First scorer and first rebound still come from the starters. Give extra weight to a starter who was first in the team's previous game (Valencia's Taylor and Sako were first in both R4 and R5).
+
 **Calibration:** read `track_record.md` (next to this file) before choosing picks. When a market type keeps losing there, use it less.
 
 **Back-testing:** `check TEAM --before R "…"` scores picks against the 3 games before round R. Use it to test the method on past games.

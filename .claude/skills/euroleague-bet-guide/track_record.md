@@ -58,3 +58,14 @@ Slips from the Wednesday PC run.
 | Šarić 7+ Ρ+Α (suggested swap) | combo | ? | OK [7,7,11] | LOST | 4 (19') |
 
 First scorer: Vezenkov ✅ (my top pick, 16%). First rebound: Miller-McIntyre (I had Vezenkov at 20%).
+
+### R5 · Tue 13/10 · Partizan 55–72 Panathinaikos (game 47, PAO by 17 away, total 127)
+**No slips received:** the user's PC-run slips were not shared, so no legs are scored.
+- First scorer: K. Hayes (PAR, starter). First rebound: E. Thompson (PAR, starter).
+- Key lines (official, min): Hayes-Davis 14 pts (27'), Francisco 8 pts / 5 ast (24'), Lessort 4 pts / 9 reb (21'), Fall 6 pts / 7 reb (14'), Yabusele 7 pts / 5 reb (20').
+
+### R5 · Tue 13/10 · Valencia 97–102 Olympiacos (game 45, OLY by 5 away, total 199)
+**No slips received:** the user's PC-run slips were not shared, so no legs are scored.
+- First scorer: K. Taylor (PAM, starter; he also scored first in Valencia's R4 game). First rebound: N. Sako (PAM, starter; also first in R4).
+- Key lines (official, min): Montero 26 pts (31', off the bench), Fournier 23 pts / 4 ast (37', started), Vezenkov 14 pts / 7 reb (27'), Milutinov 7 reb (23', started), Miller-McIntyre 3 pts / 1 ast (14'), Dorsey 2 pts (5').
+- Rule checks: Miller-McIntyre had 13 and 14 minutes in R4–R5 (LOW-MIN would block him). Dorsey's minutes went 27 → 17 → 5 (MIN-DROP would block him).
