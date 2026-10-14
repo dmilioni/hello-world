@@ -1,6 +1,6 @@
 ---
 name: euroleague-bet-guide
-description: Before each EuroLeague game of Olympiacos or Panathinaikos, research the game (calendar, player form in EuroLeague and the Greek league, news, injuries, travel and fatigue, last season's head-to-head) and propose three Stoiximan.gr Bet Builder slips — low risk about 5x, medium 20–25x, high 50–80x — built for the highest chance of winning at each payout. Use when the user asks for bets, a bet builder, προγνωστικά or a betting plan for an Olympiacos or Panathinaikos game, or sends Stoiximan screenshots for one.
+description: Before each EuroLeague game of Olympiacos or Panathinaikos, research the game (calendar, player form in EuroLeague and the Greek league, news, injuries, travel and fatigue, last season's head-to-head) and propose four Stoiximan.gr Bet Builder slips — safest about 2x, low risk about 5x, medium 20–25x, high 50–80x — built for the highest chance of winning at each payout. Use when the user asks for bets, a bet builder, προγνωστικά or a betting plan for an Olympiacos or Panathinaikos game, or sends Stoiximan screenshots for one.
 ---
 
 # Euroleague_Bet_Guide — Olympiacos / Panathinaikos Bet Builder
@@ -9,7 +9,8 @@ Deliver, for **every upcoming EuroLeague game of Olympiacos (OLY) and Panathinai
 
 | Tier | Target total odds | Goal |
 |---|---|---|
-| Low risk | ≈ 5x (4.8–5.3) | Highest possible hit rate |
+| **Safest** | ≈ 2x (1.9–2.2) | Most likely to win. Back-test: 6 of 9 slips won, 34 of 39 legs hit. Built with the "safe" rules in Step 5. |
+| Low risk | ≈ 5x (4.8–5.3) | Highest possible hit rate (back-test: about 1 in 4 wins) |
 | Medium risk | 20x–25x | Best hit rate inside the band |
 | High risk / max profit | 50x–80x | Best hit rate inside the band |
 
@@ -219,7 +220,30 @@ python3 -I scripts/backtest.py --rounds 4,5 --grid                        # tune
 3. **Never present the 5x slip as likely to win.** Show the expected win chance (15–25%) and say that about 4 in 5 such slips lose.
 4. **Before the first game of each new round,** re-run `backtest.py --grid` with the latest rounds. Update the "tuned" config and this table only if the test-round result improves, not just the tuning round.
 
-## Step 5 — Build the three slips
+## Step 5 — Build the slips
+
+### Safest slip (≈2x): the "safe" rules
+
+Build this slip first. Every leg must pass all of these:
+1. **Price:** Stoiximan odds of **1.10–1.24** per leg. Never use a leg above 1.24 on this slip.
+2. **Minutes:** the player played **18 minutes or more in each of his last 3 EuroLeague games**, with no MIN-DROP flag.
+3. **Line:** at or below the lowest value of his last 3 games (`check` must show OK 3/3, with no LOW-MIN or THIN-MARGIN flag).
+4. **One leg per player.**
+5. **Team leg:** add the favourite to win only if your estimated chance is 70% or more.
+6. **Size:** at most 6 legs. Stop when the total reaches 1.9–2.2x.
+7. **If no legs qualify, don't build it.** Say there is no safe 2x slip for this game rather than loosening the rules.
+
+Back-test evidence (`backtest.py --config safe --target 2.0`, rounds 4–5, all 20 games):
+
+| Target | Slips won | Legs hit | Games with no qualifying slip |
+|---|---|---|---|
+| ≈2x | **6 / 9 (67%)** | 34 / 39 (87%) | 8 |
+| ≈2.5x | 2 / 5 | 24 / 28 | 12 |
+| ≈3x ("tuned" rules) | 5 / 17 (29%) | 53 / 73 | 0 |
+
+These model prices are approximate, and real Stoiximan ladders offer more 1.10–1.24 legs, so qualifying slips should be available more often than in the back-test.
+
+### The other three slips
 
 **Key principle:** for a fixed total payout, win probability = Π(your p) = Π(edge) ÷ total odds. So, to maximise the chance of winning:
 
@@ -250,13 +274,13 @@ For each game:
    - **First scorer and first rebound: only the 10 starters can realistically be first.** Use the starters (marked `*`) from each team's last game and the first-scorer / first-rebound history that the `team` command prints. Never list bench players.
      - Lesson from PAO–FEN: I gave Francisco, Lessort, Baldwin and Hayes-Davis 9–16% each, but all four come off the bench. Mitoglou, a starter who had also scored first in the previous game, scored first.
 5. **Top 5 most likely stats,** each with its odds, Stoiximan's implied probability and your probability.
-6. **Three slips** as tables with columns pick — Stoiximan market name — odds — **last 3** (for example `3/3 [6, 6, 8]`), then the total odds and the estimated chance of winning. Every leg must show its last-3 result from Step 4b.
+6. **Four slips** (safest ≈2x first, then ≈5x, 20–25x, 50–80x) as tables with columns pick — Stoiximan market name — odds — **last 3** (for example `3/3 [6, 6, 8]`), then the total odds and the estimated chance of winning. Every leg must show its last-3 result from Step 4b.
 7. **Offers used,** and how the slip qualifies.
 8. **Before you bet:** line-up checks with a specific swap for each (for example "if X is out, swap leg 4 for …"), and a note that the app's total may differ because of correlation repricing.
 9. **Stake guidance:** a small fixed fraction of the balance (for example 10% on the 5x slip, 5% on the 20–25x slip, 2–3% on the 50–80x slip). Remind the user, once and briefly, that these are estimates and that every slip can lose.
 10. **Sources** list with links.
 11. **Save the report** as Markdown to `reports/YYYY-MM-DD_HOME-AWAY.md` in the repo folder (for example `reports/2026-10-09_OLY-IST.md`), using the game date, and tell the user the path. Terminal windows on Windows often cut wide tables, so the file is the readable copy. Do not commit it.
-12. **Phone notification:** after the report is delivered, call the `PushNotification` tool (load it with ToolSearch `select:PushNotification` if needed). Send one line under 200 characters with the game and the three slips' total odds and estimated chance of winning, for example `OLY-EFS slips ready: 5.0x (24%) · 22x (5%) · 64x (1.6%). Open Claude to see the picks.`. When Remote Control is connected, this reaches the user's phone.
+12. **Phone notification:** after the report is delivered, call the `PushNotification` tool (load it with ToolSearch `select:PushNotification` if needed). Send one line under 200 characters with the game and the slips' total odds and estimated chance of winning, for example `OLY-EFS slips ready: 2.0x (60%) · 5.0x (22%) · 22x (5%) · 64x (1.6%). Open Claude to see the picks.`. When Remote Control is connected, this reaches the user's phone.
 
 ## Step 7 — Review past slips (start of every run)
 

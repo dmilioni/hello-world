@@ -105,6 +105,9 @@ CONFIGS = {
     # the rules as they were in the skill before this back-test
     "current": dict(minmin=18, mindrop=0.75, factor=1.0, stats=("reb", "ast", "pra", "pts"),
                     team=True, team_p=0.65, blowout_pts=12, per_player=1),
+    # safest slip (~2.5x): only cheap legs, at the last-3 minimum
+    "safe": dict(minmin=18, mindrop=0.75, factor=1.0, stats=("reb", "ast", "pra", "pts"),
+                 team=True, team_p=0.7, blowout_pts=99, per_player=1, max_legs=6, max_odds=1.24),
     # best variant from the R4-R5 grid search (14/10/2026): about 1 slip in 4 wins
     "tuned": dict(minmin=15, mindrop=0.75, factor=1.0, stats=("reb", "ast", "pra", "pts"),
                   team=True, team_p=0.7, blowout_pts=99, per_player=2, max_legs=8),
@@ -137,6 +140,8 @@ def candidate_legs(games, game, team, cfg):
             mean = sum(vals) / 3
             p = p_market(mean, stat, k)
             odds = max(1.10, MARGIN / max(p, 0.05))
+            if odds > cfg.get("max_odds", 99):
+                continue
             cushion = (min(vals) - k + 1) / max(mean, 1)
             legs.append({"kind": "player", "team": team, "name": name, "stat": stat, "k": k,
                          "p": p, "odds": odds, "vals": vals, "cushion": cushion})
@@ -167,7 +172,7 @@ def build_slip(games, game, cfg):
         slip.append(tl)
         total *= tl["odds"]
     for l in legs:
-        if total >= 4.8 or len(slip) >= cfg.get("max_legs", 99):
+        if total >= cfg.get("target", 5.0) * 0.96 or len(slip) >= cfg.get("max_legs", 99):
             break
         if used.get(l["name"], 0) >= cfg["per_player"]:
             continue
@@ -196,7 +201,7 @@ def run(games, rounds, cfg, verbose=False, focus=None):
         if focus and not ({g["home"], g["away"]} & focus):
             continue
         slip, total = build_slip(games, g, cfg)
-        if not slip or total < 4.5:
+        if not slip or total < cfg.get("target", 5.0) * 0.9:
             res.append((g, None, total, []))
             continue
         outcomes = [(l, *actual(g, l)) for l in slip]
@@ -224,6 +229,7 @@ def main():
     ap.add_argument("--rounds", default="4,5")
     ap.add_argument("--focus")
     ap.add_argument("--config", default="current")
+    ap.add_argument("--target", type=float, default=5.0, help="target total odds of the slip")
     ap.add_argument("--grid", action="store_true")
     ap.add_argument("--season", default="E2026")
     ap.add_argument("--cache", default=os.path.join(os.path.expanduser("~"), ".cache", "el_backtest"))
@@ -241,7 +247,7 @@ def main():
         keys = list(grid)
         rows = []
         for combo in itertools.product(*grid.values()):
-            cfg = dict(zip(keys, combo))
+            cfg = dict(zip(keys, combo), target=a.target)
             t = summary(run(games, tune, cfg))
             v = summary(run(games, test, cfg))
             f = summary(run(games, set(rounds), cfg, focus={"OLY", "PAN"}))
@@ -251,7 +257,7 @@ def main():
         for i, (_, _, t, v, f, cfg) in enumerate(rows[:15], 1):
             print(f"{i:2d}  {t[0]}/{t[1]} ({t[2]}/{t[3]})   {v[0]}/{v[1]} ({v[2]}/{v[3]})   {f[0]}/{f[1]}   {cfg}")
         return
-    cfg = CONFIGS[a.config]
+    cfg = dict(CONFIGS[a.config], target=a.target)
     res = run(games, set(rounds), cfg, verbose=True, focus=focus)
     w, n, lw, ln, skipped = summary(res)
     print(f"\nSlips won {w}/{n} (skipped {skipped}), legs won {lw}/{ln}")
