@@ -15,6 +15,8 @@ Every recommended leg, scored against the official EuroLeague box score. Read th
 
 **Back-test (14/10, rounds 4–5, all 20 EuroLeague games, slips rebuilt from pre-game data):** the best rules win about 1 in 4 of the 5x slips. No variant out of 50,400 won all four OLY/PAO games. See Step 4c in SKILL.md.
 
+**User rules from 14/10:** no winner or handicap legs; prefer guards' turnovers (hit 75% in the R4–R5 back-test) and assists; in derbies and close games Fournier, Vezenkov and Montero take OLY's late offense (72–83% of OLY's 4th-quarter points in the close wins at Žalgiris and Valencia). Score these leg types separately from now on.
+
 **Takeaway so far:** the short ladders priced at 1.30–1.50 (an implied 67–77% chance) hit only 28% of the time. Team markets were reliable.
 
 ## Game log

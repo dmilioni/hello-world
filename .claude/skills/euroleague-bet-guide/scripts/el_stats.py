@@ -12,7 +12,7 @@ Usage:
 
 check: hit rate of each pick over the team's last N played EuroLeague games.
   PLAYER is any part of the name (e.g. SARIC, MILLER). STAT is one of
-  pts reb ast 3pm 2pm stl blk pra pr pa ra. Use >= for "N+" and "Over N-0.5",
+  pts reb ast 3pm 2pm stl blk to pra pr pa ra (to = turnovers). Use >= for "N+" and "Over N-0.5",
   <= for "Under N+0.5" (Under 4.5 rebounds -> reb<=4). Games the player did
   not play count as misses. Flags: LOW-MIN (a game under 18 minutes),
   MIN-DROP (last game's minutes under 75% of the earlier ones), THIN-MARGIN
@@ -162,6 +162,7 @@ STATS = {
     "2pm": lambda p: p["FieldGoalsMade2"],
     "stl": lambda p: p["Steals"],
     "blk": lambda p: p["BlocksFavour"],
+    "to": lambda p: p["Turnovers"],
     "pra": lambda p: p["Points"] + p["TotalRebounds"] + p["Assistances"],
     "pr": lambda p: p["Points"] + p["TotalRebounds"],
     "pa": lambda p: p["Points"] + p["Assistances"],

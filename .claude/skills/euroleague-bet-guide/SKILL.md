@@ -9,7 +9,7 @@ Deliver, for **every upcoming EuroLeague game of Olympiacos (OLY) and Panathinai
 
 | Tier | Target total odds | Goal |
 |---|---|---|
-| **Safest** | ≈ 2x (1.9–2.2) | Most likely to win. Back-test: 6 of 9 slips won, 34 of 39 legs hit. Built with the "safe" rules in Step 5. |
+| **Safest** | ≈ 2x (1.9–2.2) | Most likely to win. Back-test (no winner legs): 5 of 10 slips won, 36 of 44 legs hit. Built with the "safe" rules in Step 5. |
 | Low risk | ≈ 5x (4.8–5.3) | Highest possible hit rate (back-test: about 1 in 4 wins) |
 | Medium risk | 20x–25x | Best hit rate inside the band |
 | High risk / max profit | 50x–80x | Best hit rate inside the band |
@@ -32,7 +32,7 @@ Every pick must be a Bet Builder (BB) market from the same game.
    - **Best option: the user's own Chrome browser in Greece.** If Claude in Chrome tools (`mcp__claude-in-chrome__*`) are available, which happens when the skill runs on the user's computer through the Claude Desktop app or a local `claude` session with the Chrome extension, load the `chrome-browser` skill first. Then open the game on stoiximan.gr in a new tab with Bet Builder on, and read the markets and the offers page. **Read only:** never log in, click a bet, add to the slip, deposit, or change account settings. The user places the bets.
    - If no browser tools are available (for example in the cloud session or the daily scheduled run), use the screenshots step below.
 2. **If you cannot read the odds, stop and ask the user for screenshots.** Do not guess the odds. Ask for these sections:
-   - **Κύριες Αγορές:** winner, handicap and total.
+   - **Κύριες Αγορές:** winner, handicap and total (read the handicap for the blowout rule only; never use these as legs).
    - **Player ladders and O/U lines:** Πόντοι, Ριμπάουντ, Ασίστ, Εύστοχα Τρίποντα, Εύστοχα Δίποντα, Π+Ρ+Α, Π+Α, Ρ+Α, Double-Double, Επιθετικά/Αμυντικά Ριμπάουντ.
    - **Team specials (Ειδικά ομάδων):** total threes, team rebounds, team with the most threes/rebounds.
    - **The offers page (Προσφορές / Bet Boost / Ενισχυμένες αποδόσεις, Bet Builder boosts, profit boosts, insurance):** any offer valid for this game.
@@ -122,7 +122,21 @@ Rules of thumb:
 - Ladders ("X+") at low odds (1.20–1.50) on rebounds and assists of high-minute starters are the most reliable building blocks.
 - Points props are more volatile than rebounds and assists. Threes props are the most volatile; use them only with strong evidence.
 - Avoid props on players who are questionable, just back from injury, or in a minutes battle.
-- The game-winner and the handicap are close to fair. Use them only when they fit the slip (for example a team-win pick with that team's scorers going "over").
+- **No winner prediction (user rule):** never put the match winner, the handicap or any "who wins" market (half or quarter winner, winning margin) on any slip. Still estimate the margin, but only to apply the blowout rule.
+
+## Step 4a — The user's preferred picks (apply on every slip)
+
+1. **No winner or handicap legs** (see above).
+2. **Turnovers (Λάθη) of guards are a good pick.** A guard here means a player averaging **3+ assists** over his last 3 EuroLeague games. Check with `check TEAM "NAME:to>=N"`.
+   - Back-test (R4–R5, all 20 games, line at the last-3 minimum, 18'+ each game): guards' turnovers hit **15 / 20 (75%)**, the best of any stat; other players' turnovers hit 16 / 25 (64%).
+   - The safe line is **1+ (Over 0.5)** when he had 1+ in each of his last 3. Use **2+ (Over 1.5)** only when he had 2+ in all 3 (OK 3/3): players who merely average 2+ hit Over 1.5 only 8 / 18 (44%).
+   - Not for big men or forwards unless they also pass the 3+ assists test. If Stoiximan has no turnover market for the game, say so and skip it.
+3. **Assists are a good pick.** Assist ladders at the last-3 minimum hit 62–70% in the back-test, the most reliable player stat after guards' turnovers. Choose assists before points and rebounds when both pass.
+4. **Derby and close-game personality rule:** in a derby (OLY–PAO, either Greek team against Real Madrid, Barcelona, Fenerbahçe, Efes, Žalgiris, Partizan or Crvena Zvezda) or any game expected to be close (margin under 6), **Fournier, Vezenkov and Montero take the late offense** for Olympiacos.
+   - Evidence: in OLY's close wins at Žalgiris (93–91) and Valencia (102–97), these three scored 24 of 29 and 31 of 43 of OLY's 4th-quarter points (83% and 72%). In the blowouts against Baskonia and Efes it was only 28% and 44%. Montero scored in every 4th quarter this season. Exception: the 94–96 loss at Virtus, where Ndiaye scored 17 of the 24.
+   - So in such games, prefer **points or Π+Ρ+Α legs on Fournier, Vezenkov and Montero**, one ladder step above their last-3 minimum allowed on the medium and high slips. **Skip points overs on OLY's secondary scorers** (Dorsey, Ward, Jones, Ndiaye, Papanikolaou).
+   - Montero comes off the bench; his minutes still have to pass the last-3 check.
+   - For Panathinaikos, apply the same idea only when there is clear evidence in the play-by-play of who closes games; do not guess.
 
 ## Step 4b — Check every pick against the last 3 games (mandatory)
 
@@ -137,7 +151,7 @@ python3 -I $S check OLY "MILLER:ast>=6" "VEZENKOV:reb>=5" "VEZENKOV:pra>=26"
 How to write a pick:
 - "N+" or "Over N−0.5" becomes `>=N`; "Under N+0.5" becomes `<=N`. For example, Under 4.5 rebounds is `reb<=4`.
 - Combined markets: Π+Ρ+Α → `pra`, Π+Ρ → `pr`, Π+Α → `pa`, Ρ+Α → `ra`.
-- Threes made → `3pm`, twos made → `2pm`.
+- Threes made → `3pm`, twos made → `2pm`, turnovers (Λάθη) → `to`.
 
 The script prints **OK** (3/3), **WEAK** (2/3) or **FAIL** (1/3 or 0/3), with the three values.
 
@@ -153,7 +167,7 @@ The script prints **OK** (3/3), **WEAK** (2/3) or **FAIL** (1/3 or 0/3), with th
 - **A FAIL pick is dropped.** Replace it with a market on the same player that passes, for example Šarić 7+ rebounds (FAIL: 5, 3, 10) → Šarić 7+ Ρ+Α (OK: 7, 7, 11). Or move the line one step towards safety.
 - **The only exception** is a clear role change, for example the starter at that position is now out. Even then, never use the pick on the low slip, label it "role change, FAIL on last 3", and explain why.
 - **Players with fewer than 3 EuroLeague games this season** (new signings, players back from injury, DNPs) are treated as unproven. Don't use their props, and flag them.
-- **Team picks** (winner, handicap, team totals, team rebounds or threes, "most …" markets): check the team's last 3 results the same way, by hand, from the `team` command.
+- **Team picks** (team totals, team rebounds or threes, "most …" markets; never winner or handicap): check the team's last 3 results the same way, by hand, from the `team` command.
 - **National-league games** (Greek league, Turkish league and so on) are not in the script. If the last game was a national-league game, mention it as unofficial context, but the pass/fail rule uses the 3 EuroLeague games.
 - **After any swap,** re-run `check` on the final picks so every leg on every slip has a result.
 
@@ -162,7 +176,7 @@ The script prints **OK** (3/3), **WEAK** (2/3) or **FAIL** (1/3 or 0/3), with th
   - Lesson from PAO–FEN, 8/10: Melli's minutes fell to 13 when Bingham started, and all three Melli picks lost.
 - **THIN-MARGIN** (points line above 65% of the player's last-3 average): points are volatile. **Not allowed on the low-risk slip.**
   - Lesson from PAO–FEN: Yabusele 9+ points (average 13) lost with 8.
-- **On the low-risk slip, prefer rebounds, assists and their combinations over pure points.**
+- **On the low-risk slip, prefer guards' turnovers, assists and Π+Ρ+Α over pure points and rebounds** (rebounds hit only 57–59% in the back-test).
 
 **Rotation assumptions:**
 - **Returning player who has NOT played since the injury:** expect little playing time in the first 1–2 games back. Don't assume he takes minutes from others.
@@ -175,9 +189,9 @@ The script prints **OK** (3/3), **WEAK** (2/3) or **FAIL** (1/3 or 0/3), with th
 
 **Blowout rule (big favourite):** when the main handicap is **9.5 or more**, or your predicted margin is 12 or more, starters on both sides usually play fewer minutes.
 - **No player "over" picks on the low-risk slip.**
-- **Build it from team markets** that suit the favourite: winner, a smaller handicap, team rebounds, "most rebounds" or "most defensive rebounds", and "under" picks on the underdog's team total.
+- **Build it from team stat markets** that suit the favourite: team rebounds, "most rebounds" or "most defensive rebounds", and "under" picks on the underdog's team total. Guards' turnovers at 1+ also still work (starters play about 20 minutes even in a blowout). No winner or handicap legs.
 - **On the other slips,** player overs only at the lowest ladder step and only for players whose minutes held up in earlier blowouts (check the `team` output for the game with the biggest margin).
-  - Lesson from OLY–EFS (won by 23, line −10.5): Vezenkov played 22 minutes, Miller-McIntyre 13, Šarić 19 and Strazel 18. 11 of the 12 player picks lost, while all 3 team picks (Olympiacos to win, most defensive rebounds 28–23, Fernando under) won.
+  - Lesson from OLY–EFS (won by 23, line −10.5): Vezenkov played 22 minutes, Miller-McIntyre 13, Šarić 19 and Strazel 18. 11 of the 12 player picks lost, while the team-stat picks (most defensive rebounds 28–23, Fernando under) won.
 
 **Team totals without a key scorer:** when a team's top scorer is out, lower its expected points by about 60% of his average, not 0%.
 - Lesson from OLY–EFS: Efes averaged 82.7 with Mike James but scored 66 without him. I predicted 80, and the total of 155 went well under the 172.5 line.
@@ -212,7 +226,8 @@ python3 -I scripts/backtest.py --rounds 4,5 --grid                        # tune
 | Player legs with the line at the last-3 minimum that hit next game | 55–70% (assists 70%, Π+Ρ+Α 66%, points 62%, rebounds 57%) |
 | Legs priced 1.10–1.24 | hit 83% (bookmaker implied 85%), fairly priced |
 | Legs priced 1.25–1.59 picked this way | hit 55% (implied 68–76%), **overpriced, avoid** |
-| "Favourite to win" from early-season net rating | hit 53% (model 65%). Too few games for net rating to mean much yet. |
+| "Favourite to win" from early-season net rating | hit 53% (model 65%). Winner legs are no longer used (user rule). |
+| Guards' turnovers at the last-3 minimum | hit 75% (15 / 20), the best stat |
 
 **Rules that follow from this:**
 1. **A "3/3 OK" last-3 result is not a 90%+ pick.** Players fall back towards their average, so treat it as roughly 60–70%.
@@ -229,7 +244,7 @@ Build this slip first. Every leg must pass all of these:
 2. **Minutes:** the player played **18 minutes or more in each of his last 3 EuroLeague games**, with no MIN-DROP flag.
 3. **Line:** at or below the lowest value of his last 3 games (`check` must show OK 3/3, with no LOW-MIN or THIN-MARGIN flag).
 4. **One leg per player.**
-5. **Team leg:** add the favourite to win only if your estimated chance is 70% or more.
+5. **No winner or handicap leg.** Prefer guards' turnovers at 1+ and assists, then Π+Ρ+Α, then points. Skip rebounds on this slip.
 6. **Size:** at most 6 legs. Stop when the total reaches 1.9–2.2x.
 7. **If no legs qualify, don't build it.** Say there is no safe 2x slip for this game rather than loosening the rules.
 
@@ -237,9 +252,12 @@ Back-test evidence (`backtest.py --config safe --target 2.0`, rounds 4–5, all 
 
 | Target | Slips won | Legs hit | Games with no qualifying slip |
 |---|---|---|---|
-| ≈2x | **6 / 9 (67%)** | 34 / 39 (87%) | 8 |
-| ≈2.5x | 2 / 5 | 24 / 28 | 12 |
-| ≈3x ("tuned" rules) | 5 / 17 (29%) | 53 / 73 | 0 |
+| ≈2x (no winner legs, guards' turnovers, no rebounds) | **5 / 10 (50%)** | 36 / 44 (82%) | 7 |
+| ≈2x (old rules with a winner leg, for reference) | 6 / 9 (67%) | 34 / 39 (87%) | 8 |
+| ≈3x ("tuned" rules, no winner legs) | 5 / 17 (29%) | 55 / 78 | 0 |
+| ≈5x ("tuned" rules, no winner legs) | 4 / 17 (24%) | 76 / 112 | 0 |
+
+Without the winner leg the 2x slip won 4 of 8. Adding guards' turnovers made it 5 of 10 and gives a slip for more games.
 
 These model prices are approximate, and real Stoiximan ladders offer more 1.10–1.24 legs, so qualifying slips should be available more often than in the back-test.
 
@@ -249,7 +267,7 @@ These model prices are approximate, and real Stoiximan ladders offer more 1.10�
 
 1. Use only legs with edge ≥ 1.00 (ideally ≥ 1.03).
 2. Prefer **fewer legs with higher edge** over many legs. Every leg carries bookmaker margin.
-3. Avoid legs that contradict each other (for example Francisco 5+ assists together with "Baldwin most assists in the game"). Positively correlated legs (a team win plus its PG's assists) are fine, but Stoiximan reprices those, so the app's total will be lower than the simple product.
+3. Avoid legs that contradict each other (for example Francisco 5+ assists together with "Baldwin most assists in the game"). Positively correlated legs (a PG's assists plus his center's points) are fine, but Stoiximan reprices those, so the app's total will be lower than the simple product.
 4. Hit the target band by moving a leg one ladder step up or down, not by adding weak legs.
 5. **Offers:** if a Bet Boost or Bet Builder boost applies, build the slip that qualifies for it (minimum legs, minimum odds, eligible markets) as long as the legs keep edge ≥ 1. A boost raises the edge of the whole slip. Note insurance or "money back if one leg fails" offers: they favour the slip with more, but safer, legs.
 
@@ -268,7 +286,7 @@ For each game:
 1. **Header:** teams, round, date and Greek time, venue, main-market odds.
 2. **Form table:** last 3–5 games for both teams with key player lines, plus points scored and allowed per game.
 3. **News:** injuries, returns, fatigue and travel notes.
-4. **Prediction:** score, total, win probability, first-scorer and first-rebound top 4–6 with probabilities.
+4. **Prediction:** expected score and margin (context only, no winner pick on any slip), first-scorer and first-rebound top 4–6 with probabilities.
    - **Score and margin:** start from each team's official points scored and allowed per game this season (from the `team` command), then add about +3 for home court. Don't shrink a strong team's margin towards a close game without a concrete reason such as injuries.
      - Lesson from PAO–FEN: PAO had been winning by 21 a game at home. I predicted +5; the result was +18.
    - **First scorer and first rebound: only the 10 starters can realistically be first.** Use the starters (marked `*`) from each team's last game and the first-scorer / first-rebound history that the `team` command prints. Never list bench players.
@@ -299,6 +317,7 @@ Before building new slips, look in `reports/` for reports of games that have bee
 - Never invent odds, stats or injury news. If a number is uncertain, say so.
 - The official EuroLeague site (euroleaguebasketball.net) is the ground truth for every EuroLeague fact. When sources conflict, use the official figure and mention the conflict only briefly. Label anything not yet published there as unofficial.
 - Never include a player whose availability is unconfirmed without giving a swap.
+- Never put a match-winner, handicap or other "who wins" leg on any slip (user rule).
 - Never promise or imply a guaranteed win, and never encourage chasing losses or increasing stakes after a loss.
 - If the user's balance or behaviour suggests stress about money, say so gently and suggest pausing.
 

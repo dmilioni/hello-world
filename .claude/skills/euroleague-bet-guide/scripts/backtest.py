@@ -55,6 +55,7 @@ def load_games(season, max_round, cache):
                     "name": p["Player"].strip(),
                     "min": el.minutes(p["Minutes"]),
                     "pts": p["Points"], "reb": p["TotalRebounds"], "ast": p["Assistances"],
+                    "to": p["Turnovers"],
                     "starter": p["IsStarter"],
                 })
         score = {}
@@ -89,7 +90,8 @@ def stat_value(row, stat):
     return row[stat]
 
 
-SD = {"pts": (0.40, 2.5), "reb": (0.40, 1.3), "ast": (0.45, 1.2), "pra": (0.30, 3.5), "ra": (0.38, 1.6)}
+SD = {"pts": (0.40, 2.5), "reb": (0.40, 1.3), "ast": (0.45, 1.2), "pra": (0.30, 3.5), "ra": (0.38, 1.6),
+      "to": (0.35, 0.9)}
 
 
 def p_market(mean, stat, k):
@@ -106,11 +108,14 @@ CONFIGS = {
     "current": dict(minmin=18, mindrop=0.75, factor=1.0, stats=("reb", "ast", "pra", "pts"),
                     team=True, team_p=0.65, blowout_pts=12, per_player=1),
     # safest slip (~2.5x): only cheap legs, at the last-3 minimum
-    "safe": dict(minmin=18, mindrop=0.75, factor=1.0, stats=("reb", "ast", "pra", "pts"),
-                 team=True, team_p=0.7, blowout_pts=99, per_player=1, max_legs=6, max_odds=1.24),
-    # best variant from the R4-R5 grid search (14/10/2026): about 1 slip in 4 wins
-    "tuned": dict(minmin=15, mindrop=0.75, factor=1.0, stats=("reb", "ast", "pra", "pts"),
-                  team=True, team_p=0.7, blowout_pts=99, per_player=2, max_legs=8),
+    # no team-winner legs (user rule 14/10); guard turnovers added, rebounds dropped:
+    # R4-R5 safe 2x won 5/10 (4/8 without turnovers)
+    "safe": dict(minmin=18, mindrop=0.75, factor=1.0, stats=("ast", "to", "pra", "pts"),
+                 team=False, team_p=0.7, blowout_pts=99, per_player=1, max_legs=6, max_odds=1.24),
+    # best variant from the R4-R5 grid search (14/10/2026): about 1 slip in 4 wins;
+    # no winner legs, guard turnovers added: 5x won 4/17 (3/17 before)
+    "tuned": dict(minmin=15, mindrop=0.75, factor=1.0, stats=("ast", "to", "reb", "pra", "pts"),
+                  team=False, team_p=0.7, blowout_pts=99, per_player=2, max_legs=8),
 }
 
 
@@ -132,10 +137,13 @@ def candidate_legs(games, game, team, cfg):
             continue
         if mins[-1] < cfg["mindrop"] * (sum(mins[:-1]) / 2):
             continue
+        guard = sum(r["ast"] for r in rows) / 3 >= 3
         for stat in cfg["stats"]:
+            if stat == "to" and not guard:
+                continue  # turnover legs only for guards (3+ assists a game)
             vals = [stat_value(r, stat) for r in rows]
             k = math.floor(min(vals) * cfg["factor"])
-            if k < (2 if stat in ("reb", "ast") else 4):
+            if k < ({"reb": 2, "ast": 2, "to": 1}.get(stat, 4)):
                 continue
             mean = sum(vals) / 3
             p = p_market(mean, stat, k)
@@ -241,8 +249,9 @@ def main():
     if a.grid:
         tune, test = {rounds[0]}, set(rounds[1:])
         grid = dict(minmin=[15, 18, 22, 25], mindrop=[0.75, 0.85], factor=[0.5, 0.6, 0.7, 0.8, 1.0],
-                    stats=[("reb",), ("reb", "ast"), ("reb", "ast", "pra"), ("reb", "ast", "pra", "pts")],
-                    team=[True, False], team_p=[0.6, 0.7], blowout_pts=[8, 99], per_player=[1],
+                    stats=[("reb", "ast"), ("ast", "to"), ("ast", "to", "pra"), ("ast", "to", "pra", "pts"),
+                           ("ast", "to", "reb", "pra", "pts"), ("reb", "ast", "pra", "pts")],
+                    team=[False], team_p=[0.6, 0.7], blowout_pts=[8, 99], per_player=[1],
                     max_legs=[5, 6, 8])
         keys = list(grid)
         rows = []
