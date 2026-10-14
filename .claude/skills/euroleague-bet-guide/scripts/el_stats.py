@@ -8,7 +8,13 @@ Usage:
   el_stats.py schedule [--season E2026] [--teams OLY,PAN] [--from-round N] [--to-round N]
   el_stats.py team TEAM [--season E2026] [--last N]
   el_stats.py h2h TEAM_A TEAM_B [--season E2025]
+  el_stats.py minutes TEAM [--seasons E2026,E2025]
   el_stats.py check TEAM "PLAYER:STAT>=N" ["PLAYER:STAT<=N" ...] [--last 3] [--season E2026]
+
+minutes: average minutes per player by game type: easy win (by 10+),
+  close win (by 1-9), loss, and derby (against OLY, PAN, MAD, BAR, ULK, IST,
+  ZAL, PAR, RED). DNP counts as 0. Use it to predict minutes for the game type
+  you expect.
 
 check: hit rate of each pick over the team's last N played EuroLeague games.
   PLAYER is any part of the name (e.g. SARIC, MILLER). STAT is one of
@@ -231,6 +237,43 @@ def cmd_check(args):
         print(f"{verdict:4s} {hits}/{n}  {label}: {stat} {op} {line:g}   [{shown}]  min [{', '.join(map(str, mins))}]{flag_txt}")
 
 
+BIG = {"OLY", "PAN", "MAD", "BAR", "ULK", "IST", "ZAL", "PAR", "RED"}
+GAME_TYPES = ["easy win", "close win", "loss", "derby"]
+
+
+def cmd_minutes(args):
+    for season in args.seasons.split(","):
+        data, counts = {}, {}
+        for g in schedule(season):
+            if g["played"] != "true" or args.team not in (g["homecode"], g["awaycode"]):
+                continue
+            b = box(season, g["code"])
+            sc = dict(zip([g["homecode"], g["awaycode"]], final_score(b)))
+            opp = g["awaycode"] if g["homecode"] == args.team else g["homecode"]
+            margin = sc[args.team] - sc[opp]
+            cats = ["easy win" if margin >= 10 else "loss" if margin < 0 else "close win"]
+            if opp in BIG:
+                cats.append("derby")
+            for c in cats:
+                counts[c] = counts.get(c, 0) + 1
+            for s in b["Stats"]:
+                for p in s["PlayersStats"]:
+                    if p["Team"] == args.team:
+                        for c in cats:
+                            data.setdefault(p["Player"].strip(), {}).setdefault(c, []).append(minutes(p["Minutes"]))
+        print(f"\n{args.team} {season} games: " + ", ".join(f"{c} {counts.get(c, 0)}" for c in GAME_TYPES))
+        print(f"{'player':26s}" + "".join(f"{c:>11s}" for c in GAME_TYPES) + "   avg minutes, DNP = 0")
+        rows = []
+        for name, d in data.items():
+            total = sum(sum(v) for k, v in d.items() if k != "derby")
+            if total >= 30:
+                rows.append((total, name, d))
+        for _, name, d in sorted(rows, reverse=True):
+            cells = "".join(f"{sum(d.get(c, [])) / counts[c]:11.1f}" if counts.get(c) else f"{'-':>11s}"
+                            for c in GAME_TYPES)
+            print(f"{name[:26]:26s}{cells}")
+
+
 def cmd_h2h(args):
     pair = {args.team_a, args.team_b}
     games = [g for g in schedule(args.season)
@@ -259,6 +302,9 @@ def main():
     h.add_argument("team_a")
     h.add_argument("team_b")
     h.add_argument("--season", default="E2025")
+    mn = sub.add_parser("minutes")
+    mn.add_argument("team")
+    mn.add_argument("--seasons", default="E2026,E2025")
     c = sub.add_parser("check")
     c.add_argument("team")
     c.add_argument("picks", nargs="+")
@@ -267,7 +313,7 @@ def main():
     c.add_argument("--game", type=int, help="score picks against one played game (post-game review)")
     c.add_argument("--before", type=int, help="use the last N games before this round (back-testing)")
     args = ap.parse_args()
-    {"schedule": cmd_schedule, "team": cmd_team, "h2h": cmd_h2h, "check": cmd_check}[args.cmd](args)
+    {"schedule": cmd_schedule, "team": cmd_team, "h2h": cmd_h2h, "minutes": cmd_minutes, "check": cmd_check}[args.cmd](args)
 
 
 if __name__ == "__main__":

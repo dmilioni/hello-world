@@ -198,6 +198,15 @@ The script prints **OK** (3/3), **WEAK** (2/3) or **FAIL** (1/3 or 0/3), with th
 
 **Game totals:** don't use game-total over/under on any slip. In R4–R5 the totals ranged from 127 to 199 against lines of about 160–172, which is too unpredictable.
 
+**Minutes by game type (mandatory):** run `python3 -I $S minutes OLY` (or `PAN`). It prints each player's average minutes in easy wins (by 10+), close wins (1–9), losses and derbies, for this season and last. Decide which type you expect (blowout rule for a handicap of 9.5+, a derby or a close line, or an expected loss), then read that column:
+- Use that column's minutes, not the season average, for every player leg. When a player's expected minutes are under 18, treat him as LOW-MIN.
+- Findings, 14/10/2026:
+  - **OLY close wins:** Montero 29', Fournier 29' and Ward 28', versus 19–23' in easy wins.
+  - **OLY losses:** Dorsey 27' and Miller-McIntyre 24'; in close wins they play 13'.
+  - **PAO derbies:** Hayes-Davis rises to 26.5' (15.5' in easy wins), and Mitoglou and Mantzoukas drop to about 10'.
+  - **Last season** OLY's and PAO's core players moved by less than 4' across game types.
+- This season's columns rest on 1–2 games each. When they disagree with last season, weigh last season more until 5+ games of that type exist.
+
 **Minutes matter more than the starter label:** use each player's minutes, not whether he starts.
 - Lesson from R5: Montero came off the bench and played 31 minutes for 26 points. Miller-McIntyre started but played 13–14 minutes in two straight games.
 - First scorer and first rebound still come from the starters. Give extra weight to a starter who was first in the team's previous game (Valencia's Taylor and Sako were first in both R4 and R5).
