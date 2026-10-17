@@ -73,3 +73,12 @@ First scorer: Vezenkov ✅ (my top pick, 16%). First rebound: Miller-McIntyre (I
 - First scorer: K. Taylor (PAM, starter; he also scored first in Valencia's R4 game). First rebound: N. Sako (PAM, starter; also first in R4).
 - Key lines (official, min): Montero 26 pts (31', off the bench), Fournier 23 pts / 4 ast (37', started), Vezenkov 14 pts / 7 reb (27'), Milutinov 7 reb (23', started), Miller-McIntyre 3 pts / 1 ast (14'), Dorsey 2 pts (5').
 - Rule checks: Miller-McIntyre had 13 and 14 minutes in R4–R5 (LOW-MIN would block him). Dorsey's minutes went 27 → 17 → 5 (MIN-DROP would block him).
+
+### R6 · Fri 16/10 · Panathinaikos 81–91 Hapoel Tel Aviv (game 60) and Barcelona 100–105 Olympiacos (game 58)
+**No slips received** (PC run not shared). Scored the new rules' picks instead (last-3 minimum, 18'+ each game, expected minutes by game type):
+- Guards' turnovers: **5 / 5** (Francisco 2+ → 3, Satoranský 1+ → 1, Mičić 2+ → 2, Fournier 1+ → 1, plus Satoranský in the safe slip).
+- Assists at lines of 2–4: **5 / 6** (Francisco 4+ → 4, Bryant, Satoranský, Mičić 3+ → 8, Montero 2+ → 7; Fournier 2+ → 1 missed).
+- Derby rule (OLY points): **3 / 3** (Vezenkov 9+ → 25, Montero 8+ → 13, Fournier 6+ → 6, only just). In OT/Q4, Ndiaye matched Montero's 8 points, so the rule held only partly for late scoring.
+- Back-test slips: safe ≈2x won 1 / 2 (OLY won; PAO lost on Blakeney 12+ points → 9). Tuned ≈5–6x lost 0 / 2 (rebound legs failed both times: Hayes-Davis, Satoranský, Fournier assists).
+- Winner rule: PAO lost at home as favourite, so a "PAO to win" leg would have lost.
+- First scorer: Vezenkov (OLY, 2nd time this season) and Mantzoukas (PAO starter).
