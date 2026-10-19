@@ -131,11 +131,13 @@ Rules of thumb:
    - Back-test (R4–R5, all 20 games, line at the last-3 minimum, 18'+ each game): guards' turnovers hit **15 / 20 (75%)**, the best of any stat; other players' turnovers hit 16 / 25 (64%).
    - The safe line is **1+ (Over 0.5)** when he had 1+ in each of his last 3. Use **2+ (Over 1.5)** only when he had 2+ in all 3 (OK 3/3): players who merely average 2+ hit Over 1.5 only 8 / 18 (44%).
    - Not for big men or forwards unless they also pass the 3+ assists test. If Stoiximan has no turnover market for the game, say so and skip it.
-3. **Assists are a good pick.** Assist ladders at the last-3 minimum hit 62–70% in the back-test, the most reliable player stat after guards' turnovers. Choose assists before points and rebounds when both pass. **Keep assist lines low: at or below the last-3 minimum and never above 4+.** In the R4–R5 re-run, lines of 2–4 hit 4 of 5, while 5+ and 6+ hit 0 of 4.
+3. **Assists are the core pick: every slip includes at least one assist leg** (the main playmaker of each team when he passes the last-3 check). Assist ladders at the last-3 minimum hit **72% (67 / 93)** over R4–R6, the best player stat; guards' turnovers are next at 70%. Choose assists before Π+Ρ+Α, points and rebounds when both pass. On the 5x slip, build the assist and guard-turnover legs first and add the other stats after (back-test: 5 of 29 slips won, against 4 of 30 otherwise). **Keep assist lines low: at or below the last-3 minimum and never above 4+.** In the R4–R5 re-run, lines of 2–4 hit 4 of 5, while 5+ and 6+ hit 0 of 4. In R6, lines of 2–4 hit 5 of 6.
+   - Good assist candidates seen so far: Francisco (PAO), Montero (OLY), Mičić and Satoranský (Hapoel), Bryant. Fournier's assists are unreliable (1 in the Barcelona game after 2, 6, 4).
 4. **Derby and close-game personality rule:** in a derby (OLY–PAO, either Greek team against Real Madrid, Barcelona, Fenerbahçe, Efes, Žalgiris, Partizan or Crvena Zvezda) or any game expected to be close (margin under 6), **Fournier, Vezenkov and Montero take the late offense** for Olympiacos.
    - Evidence: in OLY's close wins at Žalgiris (93–91) and Valencia (102–97), these three scored 24 of 29 and 31 of 43 of OLY's 4th-quarter points (83% and 72%). In the blowouts against Baskonia and Efes it was only 28% and 44%. Montero scored in every 4th quarter this season. Exception: the 94–96 loss at Virtus, where Ndiaye scored 17 of the 24.
    - So in such games, prefer **points or Π+Ρ+Α legs on Fournier, Vezenkov and Montero**, one ladder step above their last-3 minimum allowed on the medium and high slips. **Skip points overs on OLY's secondary scorers** (Dorsey, Ward, Jones, Ndiaye, Papanikolaou).
    - Montero comes off the bench; his minutes still have to pass the last-3 check.
+   - R6 at Barcelona (won 105–100): full-game points legs for all three hit (Vezenkov 25, Montero 13, Fournier 6 on a 6+ line), but Ndiaye matched Montero's 8 points in the 4th quarter and overtime. Use the rule for full-game points, keep the lines at the last-3 minimum, and never bet on who scores the last or late points.
    - For Panathinaikos, apply the same idea only when there is clear evidence in the play-by-play of who closes games; do not guess.
 
 ## Step 4b — Check every pick against the last 3 games (mandatory)
@@ -176,7 +178,7 @@ The script prints **OK** (3/3), **WEAK** (2/3) or **FAIL** (1/3 or 0/3), with th
   - Lesson from PAO–FEN, 8/10: Melli's minutes fell to 13 when Bingham started, and all three Melli picks lost.
 - **THIN-MARGIN** (points line above 65% of the player's last-3 average): points are volatile. **Not allowed on the low-risk slip.**
   - Lesson from PAO–FEN: Yabusele 9+ points (average 13) lost with 8.
-- **On the low-risk slip, prefer guards' turnovers, assists and Π+Ρ+Α over pure points and rebounds** (rebounds hit only 57–59% in the back-test).
+- **On the low-risk slip, prefer guards' turnovers, assists and Π+Ρ+Α over pure points and rebounds** (rebounds hit only 62% over R4–R6, the weakest stat; in R6 every losing 5x slip lost on a rebound leg).
 
 **Rotation assumptions:**
 - **Returning player who has NOT played since the injury:** expect little playing time in the first 1–2 games back. Don't assume he takes minutes from others.
@@ -232,11 +234,11 @@ python3 -I scripts/backtest.py --rounds 4,5 --grid                        # tune
 | Rule variants that won all 4 OLY/PAO 5x slips | **0 of 50,400** |
 | Best realistic 5x slip win rate across all games | **about 1 in 4 (18–25%)** |
 | The variant that won 2 of 4 OLY/PAO slips, on all other games | 1 of 13. It was fitted to those games, not better. |
-| Player legs with the line at the last-3 minimum that hit next game | 55–70% (assists 70%, Π+Ρ+Α 66%, points 62%, rebounds 57%) |
+| Player legs with the line at the last-3 minimum that hit next game (R4–R6) | assists 72%, guards' turnovers 70%, Π+Ρ+Α 67%, points 66%, rebounds 62% |
 | Legs priced 1.10–1.24 | hit 83% (bookmaker implied 85%), fairly priced |
 | Legs priced 1.25–1.59 picked this way | hit 55% (implied 68–76%), **overpriced, avoid** |
 | "Favourite to win" from early-season net rating | hit 53% (model 65%). Winner legs are no longer used (user rule). |
-| Guards' turnovers at the last-3 minimum | hit 75% (15 / 20), the best stat |
+| Guards' turnovers at the last-3 minimum | hit 75% (15 / 20) in R4–R5, 5 / 5 in R6 |
 
 **Rules that follow from this:**
 1. **A "3/3 OK" last-3 result is not a 90%+ pick.** Players fall back towards their average, so treat it as roughly 60–70%.
@@ -257,14 +259,14 @@ Build this slip first. Every leg must pass all of these:
 6. **Size:** at most 6 legs. Stop when the total reaches 1.9–2.2x.
 7. **If no legs qualify, don't build it.** Say there is no safe 2x slip for this game rather than loosening the rules.
 
-Back-test evidence (`backtest.py --config safe --target 2.0`, rounds 4–5, all 20 games):
+Back-test evidence (`backtest.py --rounds 4,5,6`, all 30 games, assist lines capped at 4+):
 
 | Target | Slips won | Legs hit | Games with no qualifying slip |
 |---|---|---|---|
-| ≈2x (no winner legs, guards' turnovers, no rebounds) | **5 / 10 (50%)** | 36 / 44 (82%) | 7 |
+| ≈2x ("safe": assists, guards' turnovers, Π+Ρ+Α, points; no rebounds) | **8 / 17 (47%)** | 59 / 73 (81%) | 13 |
 | ≈2x (old rules with a winner leg, for reference) | 6 / 9 (67%) | 34 / 39 (87%) | 8 |
-| ≈3x ("tuned" rules, no winner legs) | 5 / 17 (29%) | 55 / 78 | 0 |
-| ≈5x ("tuned" rules, no winner legs) | 4 / 17 (24%) | 76 / 112 | 0 |
+| ≈3x ("tuned" rules, no winner legs) | 8 / 30 (27%) | 100 / 138 | 0 |
+| ≈5x ("tuned", assists and turnovers first) | 5 / 29 (17%) | 141 / 195 | 1 |
 
 Without the winner leg the 2x slip won 4 of 8. Adding guards' turnovers made it 5 of 10 and gives a slip for more games.
 

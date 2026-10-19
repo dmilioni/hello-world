@@ -111,11 +111,13 @@ CONFIGS = {
     # no team-winner legs (user rule 14/10); guard turnovers added, rebounds dropped:
     # R4-R5 safe 2x won 5/10 (4/8 without turnovers)
     "safe": dict(minmin=18, mindrop=0.75, factor=1.0, stats=("ast", "to", "pra", "pts"),
-                 team=False, team_p=0.7, blowout_pts=99, per_player=1, max_legs=6, max_odds=1.24),
+                 team=False, team_p=0.7, blowout_pts=99, per_player=1, max_legs=6, max_odds=1.24,
+                 ast_cap=4),  # R4-R6: 8/17 won
     # best variant from the R4-R5 grid search (14/10/2026): about 1 slip in 4 wins;
     # no winner legs, guard turnovers added: 5x won 4/17 (3/17 before)
     "tuned": dict(minmin=15, mindrop=0.75, factor=1.0, stats=("ast", "to", "reb", "pra", "pts"),
-                  team=False, team_p=0.7, blowout_pts=99, per_player=2, max_legs=8),
+                  team=False, team_p=0.7, blowout_pts=99, per_player=2, max_legs=8,
+                  ast_cap=4, ast_first=True),  # R4-R6 at 5x: 5/29 won (4/30 without ast_first)
 }
 
 
@@ -143,6 +145,8 @@ def candidate_legs(games, game, team, cfg):
                 continue  # turnover legs only for guards (3+ assists a game)
             vals = [stat_value(r, stat) for r in rows]
             k = math.floor(min(vals) * cfg["factor"])
+            if stat == "ast":
+                k = min(k, cfg.get("ast_cap", 99))  # assist lines above 4+ missed 0/4 in R4-R5
             if k < ({"reb": 2, "ast": 2, "to": 1}.get(stat, 4)):
                 continue
             mean = sum(vals) / 3
@@ -175,6 +179,9 @@ def build_slip(games, game, cfg):
     if blowout:
         legs = [l for l in legs if l["stat"] in ("reb",) and l["team"] != tl["team"]]
     legs.sort(key=lambda l: (-l["cushion"], -l["odds"]))
+    if cfg.get("ast_first"):
+        # user rule: every slip leads with assist (and guard turnover) legs
+        legs.sort(key=lambda l: l["stat"] not in ("ast", "to"))
     slip, total, used = [], 1.0, {}
     if cfg["team"] and tl["p"] >= cfg["team_p"]:
         slip.append(tl)
