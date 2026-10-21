@@ -118,6 +118,11 @@ CONFIGS = {
     "tuned": dict(minmin=15, mindrop=0.75, factor=1.0, stats=("ast", "to", "reb", "pra", "pts"),
                   team=False, team_p=0.7, blowout_pts=99, per_player=2, max_legs=8,
                   ast_cap=4, ast_first=True),  # R4-R6 at 5x: 5/29 won (4/30 without ast_first)
+    # best 5x variant over R4-R6 (21/10/2026): 5/24 slips won (21%); skips or shrinks
+    # slips in expected blowouts (predicted margin 8+) instead of betting them
+    "max5x": dict(minmin=15, mindrop=0.75, factor=1.0, stats=("ast", "to", "reb", "pra", "pts"),
+                  team=False, team_p=0.7, blowout_pts=8, per_player=1, max_legs=8,
+                  ast_cap=4, ast_first=True),
 }
 
 

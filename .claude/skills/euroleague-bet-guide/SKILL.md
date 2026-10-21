@@ -240,6 +240,13 @@ python3 -I scripts/backtest.py --rounds 4,5 --grid                        # tune
 | "Favourite to win" from early-season net rating | hit 53% (model 65%). Winner legs are no longer used (user rule). |
 | Guards' turnovers at the last-3 minimum | hit 75% (15 / 20) in R4–R5, 5 / 5 in R6 |
 
+**Best 5x rule set (21/10/2026, 1,728 variants on all 30 games of R4–R6; `backtest.py --config max5x`):** won **5 of 24 slips (21%)**, the highest of any variant. The old "tuned" rules won 5 of 29 (17%).
+1. Lines at each player's **last-3 minimum**; players with **15'+ in each of the last 3** and no MIN-DROP.
+2. **Assist and guard-turnover legs first** (assists capped at 4+), then Π+Ρ+Α, points and rebounds.
+3. **One leg per player**, at most **8 legs**.
+4. **Expected margin 8+ (handicap 7.5 or more): don't force a 5x slip.** Use only underdog rebound legs, and if they don't reach 5x, skip the 5x slip for that game. This is where the gain comes from: the same 5 wins, with 5 fewer losing slips.
+5. Still no winner or handicap legs. Expect about **1 win in 5**.
+
 **Re-run 21/10/2026 (rounds 4–6, all three Olympiacos games):** 1,308 rule variants for the ≈5x slip, plus 960 more limited to the two non-blowout games (R5, R6). **No variant won every Olympiacos 5x slip, and none won both R5 and R6.** The best won 1 of 3.
 - R4 (Efes, won by 23) is unwinnable with player overs: 11 of 17 candidate legs failed because the starters sat in the blowout.
 - In R5 and R6, 85–91% of candidate legs hit. But a 5x slip needs 8–10 legs, and one miss (Osetkowski, Punter, Fournier's assists) sinks it.
