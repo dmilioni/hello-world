@@ -275,6 +275,10 @@ Back-test evidence (`backtest.py --rounds 4,5,6`, all 30 games, assist lines cap
 
 Without the winner leg the 2x slip won 4 of 8. Adding guards' turnovers made it 5 of 10 and gives a slip for more games.
 
+**Olympiacos check (21/10/2026, 4,032 rule variants on R4–R6):** the "safe" rules above won **2 of 2** Olympiacos 2x slips (R5 at Valencia, R6 at Barcelona; 9 of 9 legs) and built no slip for the R4 blowout against Efes, which is the right call.
+- Six looser variants also won all 3 Olympiacos games (legs up to 1.30, players with 15'+, rebounds allowed). But across all 30 games they won only 28–30% of slips, against 47% for the safe rules. They fit Olympiacos's three games by luck, so **don't loosen the safe rules to force a slip.** When nothing qualifies, say "no safe slip for this game".
+- Several winning legs landed exactly on the line (Montero 2 assists, Fournier 1 turnover, Mirotić 2 rebounds). Always pick the lowest available step of each ladder.
+
 These model prices are approximate, and real Stoiximan ladders offer more 1.10–1.24 legs, so qualifying slips should be available more often than in the back-test.
 
 ### The other three slips
