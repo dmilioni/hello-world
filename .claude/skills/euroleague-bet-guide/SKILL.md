@@ -240,6 +240,11 @@ python3 -I scripts/backtest.py --rounds 4,5 --grid                        # tune
 | "Favourite to win" from early-season net rating | hit 53% (model 65%). Winner legs are no longer used (user rule). |
 | Guards' turnovers at the last-3 minimum | hit 75% (15 / 20) in R4–R5, 5 / 5 in R6 |
 
+**Re-run 21/10/2026 (rounds 4–6, all three Olympiacos games):** 1,308 rule variants for the ≈5x slip, plus 960 more limited to the two non-blowout games (R5, R6). **No variant won every Olympiacos 5x slip, and none won both R5 and R6.** The best won 1 of 3.
+- R4 (Efes, won by 23) is unwinnable with player overs: 11 of 17 candidate legs failed because the starters sat in the blowout.
+- In R5 and R6, 85–91% of candidate legs hit. But a 5x slip needs 8–10 legs, and one miss (Osetkowski, Punter, Fournier's assists) sinks it.
+- A 100% record is not reachable by tuning on 3 games. A rule that fits past games perfectly would be overfitting and would not repeat. Keep presenting the 5x slip at its real chance (about 1 in 5).
+
 **Rules that follow from this:**
 1. **A "3/3 OK" last-3 result is not a 90%+ pick.** Players fall back towards their average, so treat it as roughly 60–70%.
 2. **On the 5x slip, use only legs that Stoiximan prices 1.10–1.24, plus at most one leg at 1.25–1.39** if it has a clear reason (for example a confirmed role increase). Reaching 5x then takes 8–10 legs, which is why the realistic win rate is about 1 in 5.
